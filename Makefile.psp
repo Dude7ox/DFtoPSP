@@ -4,22 +4,25 @@ PSPSDK := $(PSPDEV)/psp/sdk
 CXX = $(PSPDEV)/bin/psp-g++
 CC = $(PSPDEV)/bin/psp-gcc
 TARGET = dfpsp
-OBJS = src/core/Vfs.o src/core/Bsa.o src/core/Texture.o src/core/Arch3d.o src/core/Rdb.o src/core/Maps.o src/core/Scene.o src/platform/psp/main.o src/platform/psp/PspRenderer.o src/platform/psp/pthread_stubs.o
+OBJS = src/core/Vfs.o src/core/Bsa.o src/core/Texture.o src/core/Arch3d.o src/core/Rdb.o src/core/Maps.o src/core/Scene.o src/core/Dungeon.o src/platform/psp/main.o src/platform/psp/PspRenderer.o src/platform/psp/syscalls.o
 INCDIR = src $(PSPSDK)/include $(PSPDEV)/psp/include
 CXXFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 -fno-rtti -fno-exceptions $(addprefix -I,$(INCDIR))
 CFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 $(addprefix -I,$(INCDIR))
-LIBS = -lpspgu -lpspgum -lpspdisplay -lpspctrl -lpspge -lpspuser -lpsplibcglue -lpspdebug -lstdc++ -lm
 LDFLAGS = -L$(PSPSDK)/lib -L$(PSPDEV)/psp/lib -Wl,-zmax-page-size=128
+# Keep C++/pthread glue in a group, then PSP SDK libraries last for import fixup.
+LIBS = -lstdc++ -lm -Wl,--start-group -lcglue -lpthreadglue -lpthread -Wl,--end-group -lpspgu -lpspgum -lpspdisplay -lpspctrl -lpspge -lpspuser -lpspsdk -lpspdebug -lc
 all: EBOOT.PBP
 $(TARGET).elf: $(OBJS)
-	$(CXX) $(LDFLAGS) -o $@ -Wl,--start-group $(OBJS) $(LIBS) -Wl,--end-group
-src/platform/psp/pthread_stubs.o: src/platform/psp/pthread_stubs.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 PARAM.SFO:
 	PATH=$(PSPDEV)/bin:$$PATH mksfoex -d MEMSIZE=1 'DFtoPSP' $@
 EBOOT.PBP: $(TARGET).elf PARAM.SFO
+	PATH=$(PSPDEV)/bin:$$PATH psp-fixup-imports $(TARGET).elf
 	PATH=$(PSPDEV)/bin:$$PATH pack-pbp $@ PARAM.SFO NULL NULL NULL NULL NULL $(TARGET).elf NULL
 clean:
 	rm -f $(OBJS) $(TARGET).elf PARAM.SFO EBOOT.PBP
+.PHONY: all clean

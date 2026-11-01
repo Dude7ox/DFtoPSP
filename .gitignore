@@ -1,0 +1,10 @@
+/build/
+/build-psp/
+*.o
+*.a
+*.elf
+*.prx
+*.SFO
+*.PBP
+__pycache__/
+.venv/

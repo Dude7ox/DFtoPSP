@@ -6,5 +6,6 @@
 *.prx
 *.SFO
 *.PBP
+!/EBOOT.PBP
 __pycache__/
 .venv/

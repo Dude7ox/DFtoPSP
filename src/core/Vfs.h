@@ -10,6 +10,8 @@ public:
     bool addRoot(const std::string& dir);
     bool loadModList(const std::string& root);
     bool readFile(const std::string& name, std::vector<u8>& out) const;
+    // Partial read: `size` bytes starting at `offset`, or to end of file when size==0.
+    bool readFile(const std::string& name, std::vector<u8>& out, size_t offset, size_t size) const;
     bool exists(const std::string& name) const;
     std::string resolve(const std::string& name) const;
     std::vector<u8> readRequired(const std::string& name) const;

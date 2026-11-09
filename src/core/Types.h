@@ -6,7 +6,7 @@
 #include <array>
 
 namespace dfpsp {
-using u8=uint8_t; using u16=uint16_t; using u32=uint32_t; using i16=int16_t; using i32=int32_t;
+using u8=uint8_t; using u16=uint16_t; using u32=uint32_t; using u64=uint64_t; using i16=int16_t; using i32=int32_t;
 struct Vec2 { float x=0,y=0; };
 struct Vec3 {
     float x=0,y=0,z=0;
@@ -19,7 +19,7 @@ struct Vec3 {
     Vec3 norm()const{float l=len();return l>1e-8f?(*this)*(1.f/l):Vec3{0,0,0};}
 };
 struct Vertex { Vec3 p; Vec2 uv; Vec3 n; u32 color=0xffffffff; };
-struct Texture { int w=0,h=0; std::vector<u8> rgba; std::vector<u8> indices; bool transparent=false; };
+struct Texture { int w=0,h=0,frames=1; std::vector<u8> rgba; std::vector<u8> indices; bool transparent=false; };
 struct Mesh {
     std::vector<Vertex> verts; // triangles
     std::vector<int> texArchive, texRecord; // per triangle

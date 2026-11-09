@@ -6,6 +6,61 @@ Vec3 rotateY(const Vec3& p,float deg){float r=deg*3.14159265358979f/180.f,c=std:
 static bool isDoorModel(const RdbModelRef& ref){
     return ref.id!=72100 && (ref.desc=="DOR"||ref.desc=="DDR"||ref.desc=="NEW"||ref.desc=="CAV");
 }
+static bool wallTri(const Tri& t){
+    Vec3 n=t.v[0].n+t.v[1].n+t.v[2].n;
+    float nl=n.len();if(nl<1e-6f)return false;
+    return std::fabs(n.y/nl)<=0.5f;   // floors, ceilings and stairs stay visible
+}
+void buildWallGrid(Scene& s){
+    s.walls.clear();
+    for(auto& t:s.tris)if(wallTri(t))s.walls.push_back(t);
+    for(auto& d:s.doors)for(auto& t:d.world)if(wallTri(t))s.walls.push_back(t);
+}
+static bool segTri(const Vec3& o,const Vec3& d,const Tri& t){
+    Vec3 e1=t.v[1].p-t.v[0].p,e2=t.v[2].p-t.v[0].p;
+    Vec3 p=d.cross(e2);float det=e1.dot(p);
+    if(std::fabs(det)<1e-8f)return false;
+    float inv=1.f/det;Vec3 tv=o-t.v[0].p;
+    float u=tv.dot(p)*inv;if(u<-0.001f||u>1.001f)return false;
+    Vec3 q=tv.cross(e1);float v=d.dot(q)*inv;
+    if(v<-0.001f||u+v>1.001f)return false;
+    float tt=e2.dot(q)*inv;return tt>=-0.001f&&tt<=1.001f;
+}
+bool sceneBlocksSight(const Scene& s,const Vec3& a,const Vec3& b){
+    Vec3 d=b-a;
+    float dist=d.len();
+    if(dist<1e-3f)return false;
+    Vec3 lo{std::min(a.x,b.x),std::min(a.y,b.y),std::min(a.z,b.z)};
+    Vec3 hi{std::max(a.x,b.x),std::max(a.y,b.y),std::max(a.z,b.z)};
+    for(auto& t:s.walls){
+        Vec3 tlo{1e9f,1e9f,1e9f},thi{-1e9f,-1e9f,-1e9f};
+        for(auto& v:t.v){
+            tlo.x=std::min(tlo.x,v.p.x);tlo.y=std::min(tlo.y,v.p.y);tlo.z=std::min(tlo.z,v.p.z);
+            thi.x=std::max(thi.x,v.p.x);thi.y=std::max(thi.y,v.p.y);thi.z=std::max(thi.z,v.p.z);
+        }
+        if(tlo.x>hi.x||thi.x<lo.x||tlo.y>hi.y||thi.y<lo.y||tlo.z>hi.z||thi.z<lo.z)continue;
+        if(segTri(a,d,t))return true;
+    }
+    return false;
+}
+static bool segAabb(const Vec3& a,const Vec3& b,const Vec3& mn,const Vec3& mx){
+    Vec3 d=b-a;
+    float t0=0.f,t1=1.f;
+    const float pa[3]={a.x,a.y,a.z},pb[3]={d.x,d.y,d.z},lo[3]={mn.x,mn.y,mn.z},hi[3]={mx.x,mx.y,mx.z};
+    for(int i=0;i<3;i++){
+        if(std::fabs(pb[i])<1e-6f){if(pa[i]<lo[i]||pa[i]>hi[i])return false;continue;}
+        float ta=(lo[i]-pa[i])/pb[i],tb=(hi[i]-pa[i])/pb[i];
+        if(ta>tb){float tmp=ta;ta=tb;tb=tmp;}
+        t0=std::max(t0,ta);t1=std::min(t1,tb);
+        if(t0>t1)return false;
+    }
+    return true;
+}
+bool doorBlocksSegment(const Door& d,const Vec3& a,const Vec3& b){
+    if(d.amount>0.5f)return false;
+    if(d.bmin.x>d.bmax.x)return false;
+    return segAabb(a,b,d.bmin,d.bmax);
+}
 void refreshDoor(Door& d){
     d.world=d.local;
     for(auto& t:d.world)for(auto& v:t.v){v.p=rotateY(v.p,d.yaw-90.f*d.amount)+d.pos;v.n=rotateY(v.n,d.yaw-90.f*d.amount);}
@@ -44,11 +99,34 @@ bool SceneBuilder::loadBlock(const std::string& name,Scene& out){
                 if(doorModel)door.local.push_back(t);
                 else {for(auto& v:t.v){v.p=rotateY(v.p,obj.rot.y)+obj.pos;v.n=rotateY(v.n,obj.rot.y);}out.tris.push_back(t);}
             }
-            if(doorModel){refreshDoor(door);out.doors.push_back(std::move(door));}
+            if(doorModel){refreshDoor(door);
+                for(auto& t:door.world)for(auto& v:t.v){
+                    door.bmin.x=std::min(door.bmin.x,v.p.x);door.bmin.y=std::min(door.bmin.y,v.p.y);door.bmin.z=std::min(door.bmin.z,v.p.z);
+                    door.bmax.x=std::max(door.bmax.x,v.p.x);door.bmax.y=std::max(door.bmax.y,v.p.y);door.bmax.z=std::max(door.bmax.z,v.p.z);
+                }
+                out.doors.push_back(std::move(door));}
         }else if(obj.type==3){
-            if(obj.texArchive==199){if(obj.texRecord==10){start=obj.pos;haveStart=true;}continue;}
+            if(obj.texArchive==199){
+                if(obj.texRecord==10){start=obj.pos;haveStart=true;}
+                else if(obj.texRecord==15||obj.texRecord==16){
+                    // Editor enemy markers. Fixed markers carry the mobile id in
+                    // the magnitude byte and the gender in the sound byte while
+                    // random markers carry the editor slot in Flags.
+                    SpawnMarker m;m.pos=obj.pos;m.fixed=(obj.texRecord==16);
+                    m.mobileType=m.fixed?obj.magnitude:0;
+                    m.passive=m.fixed&&obj.flatAction==99;
+                    m.flags=obj.flatFlags;m.soundIndex=obj.soundIndex;
+                    m.flatId=(obj.texArchive<<7)|obj.texRecord;
+                    out.markers.push_back(m);
+                }
+                continue;
+            }
             Flat f;f.pos=obj.pos;f.archive=obj.texArchive;f.record=obj.texRecord;f.action=obj.flatAction;
-            Texture tex;Palette pal;if(loadPalette(vfs_,"ART_PAL.COL",pal)&&loadTexture(vfs_,f.archive,f.record,pal,tex)){f.w=(float)tex.w;f.h=(float)tex.h;}else{f.w=f.h=32.f;}
+            TextureInfo ti;
+            if(textureInfo(vfs_,f.archive,f.record,ti)){
+                f.w=(float)(ti.w+(int)((float)ti.w*((float)ti.scaleX/256.f)));
+                f.h=(float)(ti.h+(int)((float)ti.h*((float)ti.scaleY/256.f)));
+            }else{f.w=f.h=32.f;}
             out.flats.push_back(f);out.flatCount++;
         }
     }
@@ -71,6 +149,7 @@ bool SceneBuilder::loadBlock(const std::string& name,Scene& out){
         }
         if(!found)out.spawn={1024.f,1024.f,1024.f};
     }
+    buildWallGrid(out);
     return true;
 }
 static bool pointInTriXZ(const Vec3& p,const Vec3& a,const Vec3& b,const Vec3& c){

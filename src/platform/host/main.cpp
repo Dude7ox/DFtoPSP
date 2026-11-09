@@ -3,12 +3,14 @@
 #include "../../core/Maps.h"
 #include "../../core/Dungeon.h"
 #include "../../core/SoftwareRenderer.h"
+#include "../../core/SaveGame.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
 using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
+    float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
         else if(!strcmp(argv[i],"--block")&&i+1<argc)block=argv[++i];
@@ -19,26 +21,95 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--height")&&i+1<argc)h=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--yaw")&&i+1<argc)cyaw=(float)atof(argv[++i]);
         else if(!strcmp(argv[i],"--pitch")&&i+1<argc)cpitch=(float)atof(argv[++i]);
+        else if(!strcmp(argv[i],"--tick")&&i+1<argc)tick=(float)atof(argv[++i]);
+        else if(!strcmp(argv[i],"--save")&&i+1<argc)savePath=argv[++i];
+        else if(!strcmp(argv[i],"--load")&&i+1<argc)loadPath=argv[++i];
+        else if(!strcmp(argv[i],"--level")&&i+1<argc)playerLevel=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--no-enemies"))withEnemies=false;
+        else if(!strcmp(argv[i],"--place")&&i+1<argc)place=(float)atof(argv[++i]);
+        else if(!strcmp(argv[i],"--hurt"))hurt=true;
+        else if(!strcmp(argv[i],"--kill"))kill=true;
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
     }
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");vfs.loadModList(root);vfs.loadModList(".");
-    Bsa arch3d,blocks,maps;
+    Bsa arch3d,blocks,maps,monsters;
     if(!arch3d.open(vfs,"ARCH3D.BSA")){fprintf(stderr,"ARCH3D.BSA missing\n");return 1;}
     if(!blocks.open(vfs,"BLOCKS.BSA")){fprintf(stderr,"BLOCKS.BSA missing\n");return 1;}
+    bool haveMonsters=monsters.open(vfs,"MONSTER.BSA");
     if(layout||dungeonMode){
         if(!maps.open(vfs,"MAPS.BSA")){fprintf(stderr,"MAPS.BSA missing\n");return 1;}
         DungeonLayout l;if(!loadDungeonLayout(maps,16,18358,l)){fprintf(stderr,"layout missing\n");return 1;}
-        if(layout){printf("%s region=%d ext=%d int=%d blocks=%zu\n",l.name.c_str(),l.region,l.exteriorId,l.interiorId,l.blocks.size());for(auto&b:l.blocks)printf("  %d %d %s%s\n",b.x,b.z,b.name.c_str(),b.start?" START":"");return 0;}
-        Dungeon dungeon(vfs,arch3d,blocks);if(!dungeon.enter(l)){fprintf(stderr,"dungeon load failed\n");return 1;}
+        if(layout){printf("%s region=%d ext=%d int=%d type=%d blocks=%zu\n",l.name.c_str(),l.region,l.exteriorId,l.interiorId,l.dungeonType,l.blocks.size());for(auto&b:l.blocks)printf("  %d %d %s%s\n",b.x,b.z,b.name.c_str(),b.start?" START":"");return 0;}
+        Dungeon dungeon(vfs,arch3d,blocks,monsters);
+        if(!dungeon.enter(l,playerLevel)){fprintf(stderr,"dungeon load failed\n");return 1;}
+        PlayerState player;player.level=playerLevel;
+        Vec3 feet=dungeon.spawn();
+        if(!loadPath.empty()){
+            SaveData sd;
+            if(readSave(loadPath,sd)){
+                player=sd.player;feet=player.pos;cyaw=player.yaw;cpitch=player.pitch;
+                std::vector<Enemy> es;for(auto& s:sd.enemies)es.push_back(toEnemy(s));
+                dungeon.setEnemies(es,sd.deadKeys,sd.spawnedKeys);
+                fprintf(stderr,"loaded save: %zu enemies, hp %d/%d\n",es.size(),player.hp,player.maxHp);
+            }else fprintf(stderr,"warning: cannot read %s\n",loadPath.c_str());
+        }
+        player.pos=feet;
+        float yaw=cyaw,pitch=cpitch;
+        if(place>0.f&&withEnemies){
+            // Debug helper: put the nearest monster right in front of the camera.
+            std::vector<Enemy> es=dungeon.enemies();
+            if(!es.empty()){
+                size_t bi=0;float bd=1e9f;
+                for(size_t i=0;i<es.size();i++){if(es[i].state==EnemyDead)continue;float d=(es[i].pos-feet).len();if(d<bd){bd=d;bi=i;}}
+                es[bi].pos=feet+Vec3{std::sin(yaw),0,std::cos(yaw)}*place;es[bi].flying=false;
+                if(hurt){es[bi].hp=es[bi].maxHp/2;es[bi].state=EnemyHurt;es[bi].hurtTimer=1.f;}
+                if(kill){es[bi].hp=0;es[bi].state=EnemyDead;}
+                float fy=dungeon.floor(es[bi].pos,es[bi].pos.y+96.f);if(fy>-10000.f)es[bi].pos.y=fy;
+                dungeon.setEnemies(es,dungeon.deadKeys(),dungeon.spawnedKeys());
+                fprintf(stderr,"placed %s at %.0f %.0f %.0f\n",dungeon.book().name(es[bi].mobileId).c_str(),es[bi].pos.x,es[bi].pos.y,es[bi].pos.z);
+            }
+        }
+        Vec3 fwd{std::sin(yaw),0,std::cos(yaw)};
+        if(tick>0.f){
+            // Headless simulation so screenshots and tests see live monsters.
+            int steps=(int)(tick*30.f);
+            for(int i=0;i<steps;i++){
+                float dt=1.f/30.f;
+                player.pos=feet;
+                dungeon.update(feet);dungeon.tick(dt);
+                int dmg=dungeon.tickEnemies(dt,player,fwd);
+                if(dmg>0){player.hp-=dmg;if(player.hp<0)player.hp=0;}
+                player.attackCooldown-=dt;
+            }
+        }
+        if(!savePath.empty()){
+            SaveData sd;sd.player=player;sd.player.pos=feet;sd.player.yaw=yaw;sd.player.pitch=pitch;
+            sd.region=l.region;sd.exteriorId=l.exteriorId;sd.dungeonName=l.name;
+            for(auto& e:dungeon.enemies())sd.enemies.push_back(fromEnemy(e));
+            sd.deadKeys=dungeon.deadKeys();sd.spawnedKeys=dungeon.spawnedKeys();
+            if(writeSave(savePath,sd))fprintf(stderr,"wrote %s (%zu enemies)\n",savePath.c_str(),sd.enemies.size());
+            else fprintf(stderr,"save write failed\n");
+        }
         Scene merged;merged.blockName="dungeon";for(auto& r:dungeon.resident()){merged.tris.insert(merged.tris.end(),r.scene.tris.begin(),r.scene.tris.end());merged.flats.insert(merged.flats.end(),r.scene.flats.begin(),r.scene.flats.end());for(auto& d:r.scene.doors)merged.tris.insert(merged.tris.end(),d.world.begin(),d.world.end());}
-        Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);Camera cam;cam.pos=haveCam?cpos:dungeon.spawn()+Vec3{0,64.f,0};cam.yaw=cyaw;cam.pitch=cpitch;
-        Framebuffer fb;fb.resize(w,h);SoftwareRenderer rr(vfs,pal);rr.render(merged,cam,fb);if(!writeBmp(out,fb))return 1;
-        fprintf(stderr,"dungeon: %zu resident blocks, %zu tris, spawn %.0f %.0f %.0f\n",dungeon.resident().size(),dungeon.triangleCount(),dungeon.spawn().x,dungeon.spawn().y,dungeon.spawn().z);printf("%s\n",out.c_str());return 0;
+        Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);Camera cam;cam.pos=haveCam?cpos:feet+Vec3{0,64.f,0};cam.yaw=yaw;cam.pitch=pitch;
+        Framebuffer fb;fb.resize(w,h);SoftwareRenderer rr(vfs,pal);rr.render(merged,cam,fb);
+        if(withEnemies)rr.renderEnemies(dungeon.enemies(),cam,fb);
+        if(!writeBmp(out,fb))return 1;
+        size_t alive=0,dead=0;for(auto& e:dungeon.enemies())(e.state==EnemyDead?dead:alive)++;
+        fprintf(stderr,"dungeon: %zu resident blocks, %zu tris, spawn %.0f %.0f %.0f, monsters %zu alive %zu dead %zu (book %s)\n",
+            dungeon.resident().size(),dungeon.triangleCount(),dungeon.spawn().x,dungeon.spawn().y,dungeon.spawn().z,
+            dungeon.enemies().size(),alive,dead,haveMonsters?"MONSTER.BSA":"static");
+        for(auto& e:dungeon.enemies()){
+            if(e.state==EnemyDead)continue;
+            Vec3 d=e.pos-feet;
+            if(d.len()<900.f)fprintf(stderr,"  %s lvl%d hp%d/%d at %.0f %.0f %.0f (%.0f away)\n",dungeon.book().name(e.mobileId).c_str(),e.level,e.hp,e.maxHp,e.pos.x,e.pos.y,e.pos.z,d.len());
+        }
+        printf("%s\n",out.c_str());return 0;
     }
     Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);
     SceneBuilder sb(vfs,arch3d,blocks);Scene scene;
     if(!sb.loadBlock(block,scene)){fprintf(stderr,"failed to load %s\n",block.c_str());return 1;}
-    fprintf(stderr,"loaded %s: %zu tris, %zu models, %zu flats, %zu doors\n",block.c_str(),scene.tris.size(),scene.modelCount,scene.flatCount,scene.doors.size());
+    fprintf(stderr,"loaded %s: %zu tris, %zu models, %zu flats, %zu doors, %zu markers\n",block.c_str(),scene.tris.size(),scene.modelCount,scene.flatCount,scene.doors.size(),scene.markers.size());
     Camera cam;cam.pos=haveCam?cpos:scene.spawn+Vec3{0,64.f,0};cam.yaw=cyaw;cam.pitch=cpitch;
     Framebuffer fb;fb.resize(w,h);SoftwareRenderer rr(vfs,pal);rr.render(scene,cam,fb);
     if(!writeBmp(out,fb)){fprintf(stderr,"write failed\n");return 1;}printf("%s\n",out.c_str());return 0;

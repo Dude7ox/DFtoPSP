@@ -8,6 +8,20 @@ static bool readRecordElement(Reader& r,size_t end,std::string& name,int& id){
     u32 doors=r.u32_(); if(doors>10000)return false; r.skip(doors*6); size_t h=r.p; if(h+112>end)return false;
     r.seek(h+33); id=r.u16_(); r.seek(h+71); name=r.str(32); r.seek(h+112); return true;
 }
+// The k-th dungeon location in MAPDITEM pairs with the k-th MAPTABLE entry whose
+// DungeonType is not 255 (NoDungeon); the counts match exactly per region.
+static int dungeonTypeForIndex(const Bsa& maps,int region,u32 k){
+    char fn[32];snprintf(fn,sizeof(fn),"MAPTABLE.%03d",region);
+    std::vector<u8> b;if(!maps.read(fn,b))return 255;
+    u32 seen=0;
+    for(size_t p=0;p+17<=b.size();p+=17){
+        int dt=b[p+12];
+        if(dt==255)continue;
+        if(seen==k)return dt;
+        seen++;
+    }
+    return 255;
+}
 bool loadDungeonLayout(const Bsa& maps,int region,int exteriorId,DungeonLayout& out){
     char fn[32]; snprintf(fn,sizeof(fn),"MAPDITEM.%03d",region); std::vector<u8> b; if(!maps.read(fn,b))return false;
     Reader r(b); u32 cnt=r.u32_(); if(cnt>100000)return false;
@@ -15,6 +29,7 @@ bool loadDungeonLayout(const Bsa& maps,int region,int exteriorId,DungeonLayout& 
         size_t p=4+(size_t)cnt*8+off; if(p+4>b.size())return false; r.seek(p); u32 doors=r.u32_(); if(doors>10000)return false; size_t h=p+4+(size_t)doors*6; if(h+129>b.size())return false;
         std::string nm; int id; Reader er(b.data()+h,b.size()-h); if(!readRecordElement(er,b.size(),nm,id))return false;
         out=DungeonLayout{};out.region=region;out.exteriorId=exteriorId;out.interiorId=id;out.name=nm;
+        out.dungeonType=dungeonTypeForIndex(maps,region,i);
         size_t q=h+112; Reader dr(b.data()+q,b.size()-q); dr.u16_();dr.u32_();dr.u32_(); int bc=dr.u16_(); dr.skip(5);
         if(bc<0||bc>4096)return false;
         for(int j=0;j<bc;j++){ int x=(int8_t)dr.u8_(),z=(int8_t)dr.u8_(); u16 bits=dr.u16_(); int idx=bits>>11; if(idx>4)return false; char name[16]; snprintf(name,sizeof(name),"%c%07u.RDB","BNWMS"[idx],bits&1023); out.blocks.push_back({x,z,name,(bits&0x400)!=0}); }

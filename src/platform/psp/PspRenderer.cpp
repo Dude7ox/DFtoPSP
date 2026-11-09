@@ -5,6 +5,7 @@
 #include <pspdisplay.h>
 #include <pspkernel.h>
 #include <cstring>
+#include <algorithm>
 #include <cstdlib>
 #include <cmath>
 namespace dfpsp {
@@ -34,16 +35,16 @@ bool PspRenderer::init(const Vfs& vfs,const Palette& pal){
     sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
     sceDisplayWaitVblankStart();sceGuDisplay(GU_TRUE);return true;
 }
-PspRenderer::TexSlot& PspRenderer::getTex(int a,int r){
-    for(auto& s:slots_)if(s.archive==a&&s.record==r){s.last=++tick_;return s;}
+PspRenderer::TexSlot& PspRenderer::getTex(int a,int r,int frame){
+    for(auto& s:slots_)if(s.archive==a&&s.record==r&&s.frame==frame){s.last=++tick_;return s;}
     int idx=0;u32 best=0xffffffff;for(int i=0;i<SLOTS;i++)if(slots_[i].last<best){best=slots_[i].last;idx=i;}
     TexSlot& s=slots_[idx];Texture t;
-    if(!loadTexture(*vfs_,a,r,pal_,t)||t.w==0){t.w=t.h=1;t.indices.assign(1,0);t.rgba={255,0,255,255};}
+    if(!loadTexture(*vfs_,a,r,pal_,t,frame)||t.w==0){t.w=t.h=1;t.indices.assign(1,0);t.rgba={255,0,255,255};}
     int w=1,h=1;while(w<t.w)w<<=1;while(h<t.h)h<<=1;if(w>MAX_TEX)w=MAX_TEX;if(h>MAX_TEX)h=MAX_TEX;
     u8* dst=(u8*)cpuPtr(s.offset);
     for(int y=0;y<h;y++)for(int x=0;x<w;x++){int sx=x*t.w/w,sy=y*t.h/h;dst[y*w+x]=t.indices[sy*t.w+sx];}
     sceKernelDcacheWritebackInvalidateRange(dst,w*h);
-    s.archive=a;s.record=r;s.w=w;s.h=h;s.srcW=t.w;s.srcH=t.h;s.last=++tick_;return s;
+    s.archive=a;s.record=r;s.frame=frame;s.w=w;s.h=h;s.srcW=t.w;s.srcH=t.h;s.last=++tick_;return s;
 }
 void PspRenderer::drawScene(const Scene& s,const Camera& cam){
     int n=0,curA=-1,curR=-1;
@@ -65,6 +66,50 @@ void PspRenderer::drawScene(const Scene& s,const Camera& cam){
     }
     flush();sceGuDisable(GU_BLEND);
 }
+void PspRenderer::drawEnemies(const Dungeon& d,const Camera& cam){
+    sceGuEnable(GU_BLEND);sceGuBlendFunc(GU_ADD,GU_SRC_ALPHA,GU_ONE_MINUS_SRC_ALPHA,0,0);
+    float cy=std::cos(cam.yaw),sy=std::sin(cam.yaw);Vec3 right{cy,0,-sy};
+    Vec3 fwd{sy,0,cy};
+    for(auto& e:d.enemies()){
+        Vec3 to=e.pos-cam.pos;
+        float dist=to.len();
+        if(dist>2048.f)continue;
+        if(dist>1.f&&to.norm().dot(fwd)<-0.25f)continue;
+        const EnemyStatic* st=findEnemyStatic(e.mobileId);
+        if(!st)continue;
+        int archive,record,frame=e.frame;
+        if(e.state==EnemyDead){archive=st->corpseArchive;record=st->corpseRecord;frame=0;}
+        else{archive=(e.female&&st->femaleArchive)?st->femaleArchive:st->archive;record=enemyRecord(e);}
+        TexSlot& ts=getTex(archive,record,frame);
+        sceGuTexImage(0,ts.w,ts.h,ts.w,(void*)(uintptr_t)ts.offset);sceGuTexScale(1.f/ts.srcW,1.f/ts.srcH);
+        float w=e.bodyW,h=e.bodyH;
+        if(e.state==EnemyDead)h=std::min(h,w*0.6f);
+        Vec3 p0=e.pos-right*(w*0.5f)+Vec3{0,h,0},p1=e.pos+right*(w*0.5f)+Vec3{0,h,0},p2=e.pos+right*(w*0.5f),p3=e.pos-right*(w*0.5f);
+        float u0=0,u1=w;
+        if(e.mirrored&&e.state!=EnemyDead){u0=w;u1=0;}
+        verts[0]={u0,0,0xffffffff,p0.x,p0.y,p0.z};verts[1]={u1,0,0xffffffff,p1.x,p1.y,p1.z};verts[2]={u1,h,0xffffffff,p2.x,p2.y,p2.z};
+        verts[3]={u0,0,0xffffffff,p0.x,p0.y,p0.z};verts[4]={u1,h,0xffffffff,p2.x,p2.y,p2.z};verts[5]={u0,h,0xffffffff,p3.x,p3.y,p3.z};
+        sceGumDrawArray(GU_TRIANGLES,GU_TEXTURE_32BITF|GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_3D,6,0,verts);
+        if(e.state!=EnemyDead&&e.hp<e.maxHp){
+            // Small health bar floating over the head, depth tested like the sprite.
+            sceGuDisable(GU_TEXTURE_2D);
+            float bw=w*0.7f,frac=e.maxHp>0?(float)e.hp/(float)e.maxHp:0.f;
+            Vec3 b0=e.pos-right*(bw*0.5f)+Vec3{0,h+8.f,0},b1=e.pos+right*(bw*0.5f)+Vec3{0,h+8.f,0};
+            Vec3 b2=e.pos+right*(bw*0.5f)+Vec3{0,h+12.f,0},b3=e.pos-right*(bw*0.5f)+Vec3{0,h+12.f,0};
+            verts[0]={0,0,0xc0000000,b0.x,b0.y,b0.z};verts[1]={0,0,0xc0000000,b1.x,b1.y,b1.z};verts[2]={0,0,0xc0000000,b2.x,b2.y,b2.z};
+            verts[3]={0,0,0xc0000000,b0.x,b0.y,b0.z};verts[4]={0,0,0xc0000000,b2.x,b2.y,b2.z};verts[5]={0,0,0xc0000000,b3.x,b3.y,b3.z};
+            sceGumDrawArray(GU_TRIANGLES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_3D,6,0,verts);
+            Vec3 f1=e.pos-right*(bw*0.5f)+right*(bw*frac)+Vec3{0,h+9.f,0};
+            Vec3 f2=e.pos-right*(bw*0.5f)+right*(bw*frac)+Vec3{0,h+11.f,0};
+            Vec3 f0=e.pos-right*(bw*0.5f)+Vec3{0,h+9.f,0},f3=e.pos-right*(bw*0.5f)+Vec3{0,h+11.f,0};
+            verts[0]={0,0,0xff30d030,f0.x,f0.y,f0.z};verts[1]={0,0,0xff30d030,f1.x,f1.y,f1.z};verts[2]={0,0,0xff30d030,f2.x,f2.y,f2.z};
+            verts[3]={0,0,0xff30d030,f0.x,f0.y,f0.z};verts[4]={0,0,0xff30d030,f2.x,f2.y,f2.z};verts[5]={0,0,0xff30d030,f3.x,f3.y,f3.z};
+            sceGumDrawArray(GU_TRIANGLES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_3D,6,0,verts);
+            sceGuEnable(GU_TEXTURE_2D);
+        }
+    }
+    sceGuDisable(GU_BLEND);
+}
 void PspRenderer::overlay(const char* status,float fps){
     sceGuDisable(GU_DEPTH_TEST);sceGuDisable(GU_TEXTURE_2D);sceGuEnable(GU_BLEND);sceGuBlendFunc(GU_ADD,GU_SRC_ALPHA,GU_ONE_MINUS_SRC_ALPHA,0,0);
     sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();sceGumOrtho(0,480,272,0,-1,1);sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
@@ -82,6 +127,7 @@ void PspRenderer::render(const Dungeon& d,const Camera& cam,const char* status,f
     sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
     sceGuClutMode(GU_PSM_8888,0,0xff,0);sceGuClutLoad(256/8,clut);
     for(auto& r:d.resident())drawScene(r.scene,cam);
+    drawEnemies(d,cam);
     overlay(status,fps);
     sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
 }

@@ -12,8 +12,10 @@ Implemented:
 - Loose-file / mod-directory overrides on top of original archives.
 - 3×3 dungeon-block streaming around the player, with block transitions and door-state carry-over.
 - Action doors: aim + X to open/close, locked-door feedback, animated swing, collision updates.
+- Dungeon monsters: classic spawn markers, encounter tables seeded by location id, animated
+  billboards, line-of-sight aggro, melee combat, corpses, player HP/death and binary save games.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
-- PSP controls: analog move, DPad look, X door, O run, Triangle noclip, L/R noclip vertical, Start reset, Select help, HOME exit.
+- PSP controls: analog move, DPad look, X door, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select help, HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
 - Host software renderer + CLI for validation and screenshots.
 - Cross-compiled `EBOOT.PBP` included in the repository.

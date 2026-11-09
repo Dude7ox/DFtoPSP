@@ -32,11 +32,14 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
   wander, melee attack sequences with the original per-frame damage frame,
   hurt state, corpses that persist for the session.
 - Player combat: melee swing with hit chance and armour mitigation, HP, death
-  respawn at the dungeon entrance.
-- Binary save/load (`DFPS` magic) covering player, monsters, spawn/death keys.
+  respawn at the dungeon entrance; kills award XP/gold and level-ups raise
+  max HP, skill and lockpick; locked doors can be picked.
+- Binary save/load (`DFPS` magic, format v2) covering player, progression,
+  monsters, spawn/death keys; v1 saves still load.
 - `tests/test_core` covers RLE texture parity, billboard scale, marker parse,
-  wall line-of-sight, encounter rolls, simulation stability, melee and the
-  save/load round trip.
+  wall line-of-sight, encounter rolls, simulation stability, a line-of-sight-verified
+  melee kill with XP/gold award, lockpick success rates, and the save/load round trip
+  (format v2; v1 saves remain readable).
 
 Screenshots from the host software renderer:
 - `docs/slice.png`: single-block view.
@@ -55,8 +58,17 @@ Screenshots from the host software renderer:
 - Exit callback thread, analog/DPad controls, noclip, gravity/floor snap, fall recovery.
 - Monster billboards animate per frame (T8 slots keyed by archive/record/frame),
   mirrored for the eastern orientations, with a depth-tested health bar.
-- Square swings the weapon, Start writes `SAVE0.DFS` next to the data folder and
-  the game restores it on boot.
+- Square swings the weapon; X opens doors and picks locked ones (chance scales with
+  the lockpick skill and level; failure aggros monsters near the door).
+- Kills award XP and gold; level-ups raise max HP (full heal), skill and lockpick.
+  HUD shows level and gold; save format v2 stores progression (v1 saves still load).
+- Start writes `SAVE0.DFS` next to the data folder and the game restores it on boot.
+- Boot mounts every existing data candidate as a VFS root (`data/`, `data/ARENA2/`,
+  `ms0:`/`ef0:`/`host0:` game-directory variants, nested `ARENA2/`, relative fallbacks);
+  mod lists are loaded from the game base, the save directory and the working directory.
+- A fatal missing-file error prints an on-device diagnostics panel: `sceIoGetcwd`,
+  a directory probe per candidate root, an `fopen` probe per mounted root and a
+  stdio write/read self-test in the save directory.
 
 ## Not validated
 
@@ -70,8 +82,11 @@ Screenshots from the host software renderer:
 
 ## Known gaps
 
-- No enemies, combat, AI, inventory, character progression, quests, dialogue, saves, audio,
-  spells, automap, overworld, travel, or full UI.
+- No inventory, quests, dialogue, audio, spells, automap, overworld, travel, or full UI;
+  the HUD uses the `pspDebugScreen` font because the original game fonts
+  (`TEXT.RSC` text bank / DFU converted SDF assets) are not decoded yet.
+- Overworld travel is blocked by missing terrain data (`WOODS.WLD` is not part of the
+  shipped freeware subset).
 - Only the test dungeon layout is wired into the PSP startup path.
 - Data provenance limitations remain; see `DATA.md`.
 - The manually bootstrapped PSPSDK link emits `psp-fixup-imports` ordering warnings in this

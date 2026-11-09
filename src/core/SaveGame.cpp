@@ -49,6 +49,7 @@ bool writeSave(const std::string& path,const SaveData& d){
     w.pu32(d.version);
     w.pi32(d.player.level);w.pi32(d.player.hp);w.pi32(d.player.maxHp);
     w.pi32(d.player.weaponMin);w.pi32(d.player.weaponMax);w.pi32(d.player.skill);w.pi32(d.player.armor);
+    w.pi32(d.player.lockpick);w.pi32(d.player.xp);w.pi32(d.player.gold);
     w.pf32(d.player.attackCooldown);w.pu8(d.player.dead?1:0);
     w.pf32(d.player.pos.x);w.pf32(d.player.pos.y);w.pf32(d.player.pos.z);
     w.pf32(d.player.yaw);w.pf32(d.player.pitch);
@@ -89,9 +90,10 @@ bool readSave(const std::string& path,SaveData& d){
     if(memcmp(magic,"DFPS",4)!=0)return false;
     d=SaveData{};
     d.version=r.u32v();
-    if(d.version!=1)return false;
+    if(d.version!=1&&d.version!=2)return false;
     d.player.level=r.i32v();d.player.hp=r.i32v();d.player.maxHp=r.i32v();
     d.player.weaponMin=r.i32v();d.player.weaponMax=r.i32v();d.player.skill=r.i32v();d.player.armor=r.i32v();
+    if(d.version>=2){d.player.lockpick=r.i32v();d.player.xp=r.i32v();d.player.gold=r.i32v();}
     d.player.attackCooldown=r.f32v();d.player.dead=r.u8v()!=0;
     d.player.pos.x=r.f32v();d.player.pos.y=r.f32v();d.player.pos.z=r.f32v();
     d.player.yaw=r.f32v();d.player.pitch=r.f32v();

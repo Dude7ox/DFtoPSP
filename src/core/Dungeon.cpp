@@ -109,7 +109,16 @@ int Dungeon::tickEnemies(float dt,const PlayerState& player,const Vec3& camForwa
     }
     return damage;
 }
-int Dungeon::playerAttack(const PlayerState& player,const Vec3& camForward,float range){
+static void awardProgress(PlayerState& p,int enemyLevel,DfRandom& rng){
+    p.xp+=enemyLevel*20;
+    p.gold+=rng.range(enemyLevel*5,enemyLevel*25+1);
+    // Simplified classic progression: a full bar levels the character up.
+    while(p.xp>=p.level*100){
+        p.xp-=p.level*100;
+        p.level++;p.maxHp+=8;p.hp=p.maxHp;p.skill+=2;p.lockpick+=1;
+    }
+}
+int Dungeon::playerAttack(PlayerState& player,const Vec3& camForward,float range){
     Vec3 eye=player.pos+Vec3{0,64.f,0};
     Enemy* best=nullptr;float bestScore=-1.f;
     for(auto& e:enemies_){
@@ -131,6 +140,7 @@ int Dungeon::playerAttack(const PlayerState& player,const Vec3& camForward,float
     if(best->hp<=0){
         best->hp=0;best->state=EnemyDead;
         deadSet_.insert(best->key);deadKeys_.push_back(best->key);
+        awardProgress(player,st->level,rng_);
     }else{
         best->state=EnemyHurt;best->hurtTimer=0.4f;best->animTimer=0.f;
     }
@@ -149,6 +159,18 @@ void Dungeon::setEnemies(const std::vector<Enemy>& e,const std::vector<std::stri
     enemies_=e;deadKeys_=dead;spawnedKeys_=spawned;
     deadSet_.clear();for(auto& k:deadKeys_)deadSet_.insert(k);
     spawnedSet_.clear();for(auto& k:spawnedKeys_)spawnedSet_.insert(k);
+}
+bool Dungeon::pickLock(PlayerState& player,Door& door){
+    if(!door.locked)return true;
+    float chance=0.10f+player.lockpick/200.f+player.level*0.01f;
+    if(chance<0.05f)chance=0.05f;if(chance>0.8f)chance=0.8f;
+    if(rng_.percent()<=(int)(chance*100.f)){door.locked=false;return true;}
+    // A fumbled lock alerts monsters loitering near the door.
+    for(auto& e:enemies_){
+        if(e.state==EnemyDead)continue;
+        if((e.pos-door.pos).len()<600.f){e.aggro=true;if(e.state==EnemyIdle)e.state=EnemyMove;}
+    }
+    return false;
 }
 Door* Dungeon::aimedDoor(const Vec3& eye,const Vec3& forward){Door* best=nullptr;float dist=1e9f;for(auto& r:resident_){Door* d=dfpsp::aimedDoor(r.scene,eye,forward);if(d&&(d->pos-eye).len()<dist){best=d;dist=(d->pos-eye).len();}}return best;}
 Vec3 Dungeon::move(const Vec3& feet,const Vec3& delta,float radius,float height)const{

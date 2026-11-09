@@ -11,17 +11,23 @@ Implemented:
 - Original-format readers: BSA, ARCH3D meshes, TEXTURE.* + ART_PAL.COL, BLOCKS.BSA RDB objects, MAPS.BSA dungeon layouts.
 - Loose-file / mod-directory overrides on top of original archives.
 - 3×3 dungeon-block streaming around the player, with block transitions and door-state carry-over.
-- Action doors: aim + X to open/close, locked-door feedback, animated swing, collision updates.
+- Action doors: aim + X to open/close, animated swing, collision updates; locked doors can be
+  picked with X (chance scales with the lockpick skill; failure alerts nearby monsters).
 - Dungeon monsters: classic spawn markers, encounter tables seeded by location id, animated
   billboards, line-of-sight aggro, melee combat, corpses, player HP/death and binary save games.
+- Character progression: kills award XP and gold, level-ups raise HP/skill/lockpick
+  (saved in format v2; v1 saves still load).
+- Robust boot: probes `data/`, `data/ARENA2/`, `ms0:`/`ef0:`/`host0:` game-directory variants
+  and relative paths; if a file is still missing, the fatal screen prints on-device diagnostics
+  (working directory, per-candidate directory probes, per-root file probes, stdio write/read test).
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
-- PSP controls: analog move, DPad look, X door, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select help, HOME exit.
+- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select help, HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
 - Host software renderer + CLI for validation and screenshots.
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:
-- Enemies, combat, AI, inventory, character stats, quests, dialogue, saves, audio, spells, overworld/travel.
+- Inventory, quests, dialogue, audio, spells, automap, overworld/travel, original-font UI.
 - Full campaign data coverage; the shipped data subset loads the test dungeon only.
 - Real-PSP / PPSSPP execution validation is still pending in this environment.
 

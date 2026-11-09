@@ -20,11 +20,15 @@ public:
     const DungeonLayout& layout()const{return layout_;}
     const DungeonBlockRef* current()const;
     const std::vector<Resident>& resident()const{return resident_;}
+    std::vector<Resident>& resident(){return resident_;}
     void tick(float dt);
     // Advances every monster in resident blocks; returns damage dealt to the player.
     int tickEnemies(float dt,const PlayerState& player,const Vec3& camForward);
     // Player melee swing at the best enemy in front; returns damage dealt.
-    int playerAttack(const PlayerState& player,const Vec3& camForward,float range=140.f);
+    // Player melee swing; awards xp/gold and handles levelling on a kill.
+    int playerAttack(PlayerState& player,const Vec3& camForward,float range=140.f);
+    // Skill roll against a locked door; a failed roll alerts nearby monsters.
+    bool pickLock(PlayerState& player,Door& door);
     Door* aimedDoor(const Vec3& eye,const Vec3& forward);
     Vec3 move(const Vec3& feet,const Vec3& delta,float radius,float height)const;
     float floor(const Vec3& pos,float maxY)const;

@@ -100,7 +100,25 @@ if stage pthread; then
   if [ -f "$FH" ] && ! grep -q "DFtoPSP posix threads" "$FH"; then
     printf '\n/* DFtoPSP posix threads */\n#if defined(__PSP__) && !defined(_POSIX_THREADS)\n#define _POSIX_THREADS 1\n#endif\n' >>"$FH"
   fi
-  cd "$SRC/pthread" && run make $J all && run make install
+  # pthread-embedded ships CMake only; compile the library directly.
+  cd "$SRC/pthread"
+  rm -rf build-ptw && mkdir -p build-ptw
+  objs=""
+  for f in *.c platform/psp/psp_osal.c platform/helper/*.c; do
+    [ -e "$f" ] || continue
+    o="build-ptw/$(echo "$f" | tr / _ | sed 's/\.c$/.o/')"
+    run psp-gcc -c -O3 -Wall -fno-strict-aliasing -I. -Iplatform/psp -Iplatform/helper "$f" -o "$o"
+    objs="$objs $o"
+  done
+  run psp-ar rcs "$PSPDEV/psp/lib/libpthread.a" $objs
+  for h in pthread.h pthread_public.h sched.h semaphore.h; do [ -e "$h" ] && cp "$h" "$PSPDEV/psp/include/$h"; done
+  mkdir -p "$PSPDEV/psp/include/sys" "$PSPDEV/psp/include/bits"
+  for h in sys/_pthreadtypes.h sys/sched.h; do [ -e "$h" ] && cp "$h" "$PSPDEV/psp/include/$h"; done
+  [ -e bits/posix_opt.h ] && cp bits/posix_opt.h "$PSPDEV/psp/include/bits/"
+  [ -e platform/psp/pte_types.h ] && cp platform/psp/pte_types.h "$PSPDEV/psp/include/"
+  mkdir -p "$PSPDEV/psp/include/sys"
+  [ -e pte_generic_osal.h ] && cp pte_generic_osal.h "$PSPDEV/psp/include/sys/"
+  [ -e platform/helper/tls-helper.h ] && cp platform/helper/tls-helper.h "$PSPDEV/psp/include/sys/"
   ls -l "$PSPDEV/psp/include/pthread.h" "$PSPDEV/psp/lib/libpthread.a"
   done_
 fi

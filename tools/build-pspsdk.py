@@ -48,6 +48,8 @@ def parse_am(text):
         m = re.match(r"^([A-Za-z0-9_]+)\s*=\s*(.*)$", ln)
         if m:
             vars_[m.group(1)] = m.group(2)
+    vars_.setdefault("top_srcdir", str(SDK))
+    vars_.setdefault("top_builddir", str(SDK))
     # one level of $(VAR) expansion
     def expand(s, depth=0):
         if depth > 4: return s
@@ -72,7 +74,7 @@ for mod in srcmods:
             objs.append((src, [], None))
     # grouped stub objects: $(VAR): source.S compiled once per member with -DF_<member>
     for ln in lines:
-        m = re.match(r"^\$\(([A-Za-z0-9_]+)\):\s+(\S+\.S)\s*$", ln)
+        m = re.match(r"^\$\(([A-Za-z0-9_]+)\):\s+(\S+\.(?:S|s|c))\s*$", ln)
         if not m: continue
         for obj in vars_.get(m.group(1), "").split():
             objs.append((m.group(2), ["-DF_" + obj[:-2]], obj))
@@ -83,9 +85,9 @@ for mod in srcmods:
         if not (mod / src).exists():
             continue
         if outname is None:
-            outname = re.sub(r"\.(c|S)$", ".o", src)
+            outname = re.sub(r"\.(c|S|s)$", ".o", src)
         objpath = mod / outname
-        if src.endswith(".S"):
+        if src.endswith(".S") or src.endswith(".s"):
             sh([CC, "-c"] + CFLAGS + cp + extra + [str(mod / src), "-o", str(objpath)])
         else:
             sh([CC, "-c"] + CFLAGS + cp + extra + [str(mod / src), "-o", str(objpath)])
@@ -94,7 +96,7 @@ for mod in srcmods:
         stem = lib[3:-2]
         want = []
         for src in vars_.get(f"lib{stem}_a_SOURCES", "").split():
-            want.append(mod / re.sub(r"\.(c|S)$", ".o", src))
+            want.append(mod / re.sub(r"\.(c|S|s)$", ".o", src))
         for extra in vars_.get(f"lib{stem}_a_LIBADD", "").split():
             want.append(mod / extra)
         want = [w for w in want if w.exists()]
@@ -108,12 +110,27 @@ for mod in srcmods:
             prefix = v[:-3]
             for h in vars_.get(prefix + "_HEADERS", "").split():
                 if (mod / h).exists():
+                    (INC / h).parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy(mod / h, INC / h)
 
-# host tools
+# startup: crt0 objects install next to the toolchain libs (gcc links crt0.o)
+st = SDK / "src" / "startup"
+if (st / "crt0.c").exists():
+    cp = ["-I%s" % (SDK / "src" / d) for d in ("base", "kernel", "user", "debug")]
+    for src, dst in (("crt0.c", PSPDEV / "psp" / "lib" / "crt0.o"),
+                     ("crt0_prx.c", PSPDEV / "psp" / "lib" / "crt0_prx.o"),
+                     ("prxexports.c", SDKLIB / "prxexports.o")):
+        sh([CC, "-c"] + CFLAGS + cp + [str(st / src), "-o", str(dst)])
+        print("startup:", dst.name)
+
+# host tools (they expect a generated config.h)
+cfg = SDK / "tools" / "config.h"
+if not cfg.exists():
+    cfg.write_text('#pragma once\n#define HAVE_STDINT_H 1\n#define HAVE_INTTYPES_H 1\n'
+                   '#define HAVE_MALLOC_H 1\n#define PSPSDK_TOPDIR "psp/sdk"\n')
 tvars, tlines = parse_am((SDK / "tools" / "Makefile.am").read_text())
 for prog in tvars.get("bin_PROGRAMS", "").split():
-    key = prog + "_SOURCES"
+    key = prog.replace("-", "_") + "_SOURCES"
     srcs = tvars.get(key, "").split()
     if not srcs: continue
     out = BIN / prog.replace("_", "-")

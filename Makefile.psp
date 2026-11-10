@@ -10,7 +10,7 @@ CXXFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 -fno-rtti -fno-exceptions $(
 CFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 $(addprefix -I,$(INCDIR))
 LDFLAGS = -L$(PSPSDK)/lib -L$(PSPDEV)/psp/lib -Wl,-zmax-page-size=128
 # Keep C++/pthread glue in a group, then PSP SDK libraries last for import fixup.
-LIBS = -lstdc++ -lm -Wl,--start-group -lcglue -lpthreadglue -lpthread -Wl,--end-group -lpspgu -lpspgum -lpspdisplay -lpspctrl -lpspge -lpspuser -lpspsdk -lpspdebug -lc
+LIBS = -lstdc++ -lm -Wl,--start-group -lcglue -lpthreadglue -lpthread -lpspgu -lpspgum -lpspdisplay -lpspctrl -lpspge -lpspuser -lpspsdk -lpspdebug -lc -Wl,--end-group
 all: EBOOT.PBP
 $(TARGET).elf: $(OBJS)
 	$(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
@@ -22,6 +22,7 @@ PARAM.SFO:
 	PATH=$(PSPDEV)/bin:$$PATH mksfoex -d MEMSIZE=1 'DFtoPSP' $@
 EBOOT.PBP: $(TARGET).elf PARAM.SFO
 	PATH=$(PSPDEV)/bin:$$PATH psp-fixup-imports $(TARGET).elf
+	PATH=$(PSPDEV)/bin:$$PATH psp-strip -s $(TARGET).elf
 	PATH=$(PSPDEV)/bin:$$PATH pack-pbp $@ PARAM.SFO NULL NULL NULL NULL NULL $(TARGET).elf NULL
 clean:
 	rm -f $(OBJS) $(TARGET).elf PARAM.SFO EBOOT.PBP

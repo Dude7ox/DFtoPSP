@@ -9,6 +9,7 @@
 #include "../src/core/Enemy.h"
 #include "../src/core/SaveGame.h"
 #include "../src/core/Font.h"
+#include "../src/core/Ui.h"
 #include "../src/core/SoftwareRenderer.h"
 #include "../src/core/Random.h"
 #include <cassert>
@@ -147,9 +148,41 @@ int main(int argc,char**argv){
         for(int i=0;i<300&&!opened;i++)opened=dungeon.pickLock(pr,*locked);
         CHECK(opened);CHECK(!locked->locked);
     }
+    // UI windows: message-log ring and shared window content.
+    {
+        MsgLog log;
+        for(int i=0;i<40;i++)log.push("msg "+std::to_string(i));
+        CHECK(log.size()==32);
+        CHECK(log.lines().front()=="msg 8");
+        CHECK(log.lines().back()=="msg 39");
+        PlayerState ps;ps.level=3;ps.xp=60;ps.gold=120;ps.kills=7;
+        auto sheet=charSheetLines(ps,"Test Place");
+        CHECK(sheet.size()==6);
+        CHECK(sheet[0]=="Level 3  XP 60/300");
+        CHECK(sheet[4]=="Gold 120  Kills 7");
+        CHECK(sheet[5]=="Test Place");
+        auto help=helpLines();
+        CHECK(help.size()==6);
+        Font f3;CHECK(f3.load(vfs,"FONT0003.FNT"));
+        for(auto& l:sheet)CHECK(f3.textWidth(l)<=336);   // fits the 360px panel
+        for(auto& l:help)CHECK(f3.textWidth(l)<=336);
+    }
+    // Combat messages reach the log and kills are counted.
+    {
+        MsgLog log;dungeon.setLog(&log);
+        PlayerState pr;pr.pos=sp;
+        std::vector<Enemy> es=dungeon.enemies();
+        es[0].pos=sp+corridor*100.f;es[0].hp=1;es[0].maxHp=1;es[0].state=EnemyMove;
+        dungeon.setEnemies(es,dungeon.deadKeys(),dungeon.spawnedKeys());
+        for(int i=0;i<300&&dungeon.enemies()[0].state!=EnemyDead;i++)dungeon.playerAttack(pr,corridor);
+        bool death=false;for(auto& m:log.lines())if(m.find("dies")!=std::string::npos)death=true;
+        CHECK(death);CHECK(pr.kills==1);
+        dungeon.setLog(nullptr);
+    }
     // Save / load round trip.
     {
         SaveData sd;sd.player=player;sd.player.pos=sp;sd.region=l.region;sd.exteriorId=l.exteriorId;sd.dungeonName=l.name;
+        sd.player.lockpick=31;sd.player.xp=42;sd.player.gold=43;sd.player.kills=9;
         for(auto& e:dungeon.enemies())sd.enemies.push_back(fromEnemy(e));
         sd.deadKeys=dungeon.deadKeys();sd.spawnedKeys=dungeon.spawnedKeys();
         CHECK(writeSave("test_core_save.dfs",sd));
@@ -157,6 +190,8 @@ int main(int argc,char**argv){
         CHECK(back.enemies.size()==sd.enemies.size());
         CHECK(back.dungeonName==l.name);
         CHECK(back.spawnedKeys.size()==sd.spawnedKeys.size());
+        CHECK(back.player.lockpick==31);CHECK(back.player.xp==42);CHECK(back.player.gold==43);CHECK(back.player.kills==9);
+        CHECK(back.version==3);
         remove("test_core_save.dfs");
     }
     printf("core tests passed\n");return 0;

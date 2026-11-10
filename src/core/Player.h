@@ -10,6 +10,7 @@ struct PlayerState {
     int lockpick=30;                 // lockpicking skill percent
     int armor=10;                    // worn armour value
     int xp=0, gold=0;                // progression counters
+    int kills=0;                     // monsters defeated this career
     float attackCooldown=0;          // seconds until the next swing
     bool dead=false;
     Vec3 pos;

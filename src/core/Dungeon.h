@@ -8,6 +8,7 @@
 namespace dfpsp {
 // A small resident set: the current block and its eight layout neighbours.
 // RDB coordinates remain native; one block is exactly 2048 units wide.
+class MsgLog;
 class Dungeon {
 public:
     static constexpr float BLOCK_SIDE=2048.f;
@@ -36,6 +37,8 @@ public:
     bool lineOfSight(const Vec3& a,const Vec3& b)const;
     size_t triangleCount()const;
     const EnemyBook& book()const{return book_;}
+    // Optional gameplay message sink for the UI log window.
+    void setLog(MsgLog* l){log_=l;}
     const std::vector<Enemy>& enemies()const{return enemies_;}
     const std::vector<std::string>& deadKeys()const{return deadKeys_;}
     const std::vector<std::string>& spawnedKeys()const{return spawnedKeys_;}
@@ -43,6 +46,7 @@ public:
 private:
     SceneBuilder builder_; DungeonLayout layout_; std::vector<Resident> resident_;
     EnemyBook book_;
+    MsgLog* log_=nullptr;
     std::vector<Enemy> enemies_;
     std::vector<std::string> deadKeys_, spawnedKeys_;
     std::set<std::string> deadSet_, spawnedSet_;

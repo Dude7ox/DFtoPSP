@@ -1,4 +1,5 @@
 #include "Dungeon.h"
+#include "Ui.h"
 #include <algorithm>
 #include <cmath>
 namespace dfpsp {
@@ -104,14 +105,18 @@ int Dungeon::tickEnemies(float dt,const PlayerState& player,const Vec3& camForwa
         if(!residentAt(e.pos))continue;   // only simulate monsters near the player
         const EnemyStatic* st=findEnemyStatic(e.mobileId);
         if(!st)continue;
-        damage+=updateEnemy(e,*st,w,rng_,dt);
+        int d=updateEnemy(e,*st,w,rng_,dt);
+        if(d>0&&log_)log_->push("The "+book_.name(e.mobileId)+" hits you for "+std::to_string(d)+".");
+        damage+=d;
         orientEnemy(e,player.pos,camForward);
     }
     return damage;
 }
-static void awardProgress(PlayerState& p,int enemyLevel,DfRandom& rng){
-    p.xp+=enemyLevel*20;
-    p.gold+=rng.range(enemyLevel*5,enemyLevel*25+1);
+static void awardProgress(PlayerState& p,int enemyLevel,DfRandom& rng,int& xpOut,int& goldOut){
+    xpOut=enemyLevel*20;
+    goldOut=rng.range(enemyLevel*5,enemyLevel*25+1);
+    p.xp+=xpOut;
+    p.gold+=goldOut;
     // Simplified classic progression: a full bar levels the character up.
     while(p.xp>=p.level*100){
         p.xp-=p.level*100;
@@ -134,15 +139,23 @@ int Dungeon::playerAttack(PlayerState& player,const Vec3& camForward,float range
     if(!best)return 0;
     const EnemyStatic* st=findEnemyStatic(best->mobileId);
     if(!st)return 0;
-    int dmg=playerSwingDamage(player.weaponMin,player.weaponMax,best->armor,rng_);
+    int dmg=playerSwingHits(player.skill,st->level,rng_)?playerSwingDamage(player.weaponMin,player.weaponMax,best->armor,rng_):0;
     best->hp-=dmg;
     best->aggro=true;best->passive=false;
+    std::string name=book_.name(best->mobileId);
     if(best->hp<=0){
         best->hp=0;best->state=EnemyDead;
         deadSet_.insert(best->key);deadKeys_.push_back(best->key);
-        awardProgress(player,st->level,rng_);
+        int xpG=0,goldG=0,lvlBefore=player.level;
+        awardProgress(player,st->level,rng_,xpG,goldG);
+        player.kills++;
+        if(log_){
+            log_->push("The "+name+" dies. +"+std::to_string(xpG)+" xp +"+std::to_string(goldG)+" g");
+            if(player.level>lvlBefore)log_->push("Level up! Now level "+std::to_string(player.level)+".");
+        }
     }else{
         best->state=EnemyHurt;best->hurtTimer=0.4f;best->animTimer=0.f;
+        if(log_)log_->push(dmg>0?"You hit the "+name+" for "+std::to_string(dmg)+".":"You miss the "+name+".");
     }
     return dmg;
 }
@@ -164,12 +177,13 @@ bool Dungeon::pickLock(PlayerState& player,Door& door){
     if(!door.locked)return true;
     float chance=0.10f+player.lockpick/200.f+player.level*0.01f;
     if(chance<0.05f)chance=0.05f;if(chance>0.8f)chance=0.8f;
-    if(rng_.percent()<=(int)(chance*100.f)){door.locked=false;return true;}
+    if(rng_.percent()<=(int)(chance*100.f)){door.locked=false;if(log_)log_->push("You pick the lock.");return true;}
     // A fumbled lock alerts monsters loitering near the door.
     for(auto& e:enemies_){
         if(e.state==EnemyDead)continue;
         if((e.pos-door.pos).len()<600.f){e.aggro=true;if(e.state==EnemyIdle)e.state=EnemyMove;}
     }
+    if(log_)log_->push("The lock holds.");
     return false;
 }
 Door* Dungeon::aimedDoor(const Vec3& eye,const Vec3& forward){Door* best=nullptr;float dist=1e9f;for(auto& r:resident_){Door* d=dfpsp::aimedDoor(r.scene,eye,forward);if(d&&(d->pos-eye).len()<dist){best=d;dist=(d->pos-eye).len();}}return best;}

@@ -23,13 +23,13 @@ Implemented:
 - Original `FONT000?.FNT` bitmap faces (DFU-compatible reader): HUD and screenshots
   render in the classic FONT0001 gothic face on host and PSP.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
-- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select help, HOME exit.
+- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window (help/character/log), HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
 - Host software renderer + CLI for validation and screenshots.
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:
-- Inventory, quests, dialogue, audio, spells, automap, overworld/travel, UI windows.
+- Inventory, quests, dialogue, audio, spells, automap, overworld/travel.
 - Full campaign data coverage; the shipped data subset loads the test dungeon only.
 - Real-PSP / PPSSPP execution validation is still pending in this environment.
 

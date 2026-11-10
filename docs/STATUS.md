@@ -17,10 +17,10 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Single-block load: `B0000001.RDB` -> 1128 world triangles, 36 model instances,
   12 gameplay flats, 4 action doors.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
-- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 455 checked, 0 bad.
+- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 460 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 1,408,228 bytes (original-font HUD build)
-  - SHA-256: `a02eb9c0269dbd6e3015ec8ec332b0e41f6f610b009d6648a257a0bbf20c9d15`
+  - `EBOOT.PBP`: 1,419,412 bytes (UI-window build)
+  - SHA-256: `bfc0967a50187731bd57a608152645b5133cb96e58281c7d13dedef2d9e4bab7`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -68,7 +68,19 @@ Screenshots from the host software renderer:
 - Square swings the weapon; X opens doors and picks locked ones (chance scales with
   the lockpick skill and level; failure aggros monsters near the door).
 - Kills award XP and gold; level-ups raise max HP (full heal), skill and lockpick.
-  HUD shows level and gold; save format v2 stores progression (v1 saves still load).
+  HUD shows level and gold; save format v3 stores progression including the kill
+  counter (v1 and v2 saves still load).
+- Select cycles UI windows: off, HELP, CHARACTER and MESSAGE LOG. Panels are
+  translucent plates with a FONT0001 title and FONT0003 body lines (core `Ui`
+  builds the content for both platforms; GE draws them via `queueRect` plus the
+  text queue, the host blits the same layout, `--ui char|help|log`, docs/ui.png).
+- The message log is a 32-line ring fed by hits, misses, kills, level-ups,
+  lockpick results and monster damage; the CHARACTER sheet shows level, XP,
+  HP, armor, weapon skill, lockpicking, gold, kills and the dungeon name.
+- Combat accuracy fix: `enemySwingHits`/`playerSwingHits` compared
+  `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
+  never land a blow; both now scale to percent and player swings roll to hit
+  (0 damage = miss, logged as such).
 - Start writes `SAVE0.DFS` next to the data folder and the game restores it on boot.
 - Boot mounts every existing data candidate as a VFS root (`data/`, `data/ARENA2/`,
   `ms0:`/`ef0:`/`host0:` game-directory variants, nested `ARENA2/`, relative fallbacks);
@@ -90,9 +102,9 @@ Screenshots from the host software renderer:
 
 ## Known gaps
 
-- No inventory, quests, dialogue, audio, spells, automap, overworld, travel, or
-  UI windows yet; text now renders in the original game faces, so message/inventory
-  screens can be built on top of `Font`/`drawText` without further research.
+- No inventory, quests, dialogue, audio, spells, automap, overworld or travel
+  yet; the first UI windows (help/character/log) now render in the original
+  faces, and inventory/quest screens can reuse the same panel code.
 - Overworld travel is blocked by missing terrain data (`WOODS.WLD` is not part of the
   shipped freeware subset).
 - Only the test dungeon layout is wired into the PSP startup path.

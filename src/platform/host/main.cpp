@@ -3,6 +3,7 @@
 #include "../../core/Maps.h"
 #include "../../core/Dungeon.h"
 #include "../../core/SoftwareRenderer.h"
+#include "../../core/Font.h"
 #include "../../core/SaveGame.h"
 #include <cstdio>
 #include <cstring>
@@ -94,6 +95,15 @@ int main(int argc,char**argv){
         Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);Camera cam;cam.pos=haveCam?cpos:feet+Vec3{0,64.f,0};cam.yaw=yaw;cam.pitch=pitch;
         Framebuffer fb;fb.resize(w,h);SoftwareRenderer rr(vfs,pal);rr.render(merged,cam,fb);
         if(withEnemies)rr.renderEnemies(dungeon.enemies(),cam,fb);
+        // HUD text in the original FONT0001 face when the data provides it.
+        Font font;font.load(vfs,"FONT0001.FNT");
+        if(font.loaded()){
+            size_t live=0;for(auto& e:dungeon.enemies())if(e.state!=EnemyDead)live++;
+            char hud[96];
+            snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg Aggro %zu",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,live);
+            drawText(fb,font,4,3,hud,rgba(255,255,255));
+            drawText(fb,font,4,h-16,l.name.c_str(),rgba(255,232,128));
+        }
         if(!writeBmp(out,fb))return 1;
         size_t alive=0,dead=0;for(auto& e:dungeon.enemies())(e.state==EnemyDead?dead:alive)++;
         fprintf(stderr,"dungeon: %zu resident blocks, %zu tris, spawn %.0f %.0f %.0f, monsters %zu alive %zu dead %zu, player Lv%d xp%d %dg (book %s)\n",

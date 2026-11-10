@@ -20,6 +20,8 @@ Implemented:
 - Robust boot: probes `data/`, `data/ARENA2/`, `ms0:`/`ef0:`/`host0:` game-directory variants
   and relative paths; if a file is still missing, the fatal screen prints on-device diagnostics
   (working directory, per-candidate directory probes, per-root file probes, stdio write/read test).
+- Original `FONT000?.FNT` bitmap faces (DFU-compatible reader): HUD and screenshots
+  render in the classic FONT0001 gothic face on host and PSP.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
 - PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select help, HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
@@ -27,7 +29,7 @@ Implemented:
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:
-- Inventory, quests, dialogue, audio, spells, automap, overworld/travel, original-font UI.
+- Inventory, quests, dialogue, audio, spells, automap, overworld/travel, UI windows.
 - Full campaign data coverage; the shipped data subset loads the test dungeon only.
 - Real-PSP / PPSSPP execution validation is still pending in this environment.
 

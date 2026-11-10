@@ -1,5 +1,6 @@
 #include "SoftwareRenderer.h"
 #include "Enemy.h"
+#include "Font.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -111,4 +112,19 @@ void SoftwareRenderer::renderEnemies(const std::vector<Enemy>& enemies,const Cam
     }
 }
 bool writeBmp(const std::string& path,const Framebuffer& fb){FILE*f=fopen(path.c_str(),"wb");if(!f)return false;int row=(fb.w*3+3)&~3;u32 sz=54+row*fb.h;u8 hdr[54]={};hdr[0]='B';hdr[1]='M';*(u32*)(hdr+2)=sz;*(u32*)(hdr+10)=54;*(u32*)(hdr+14)=40;*(i32*)(hdr+18)=fb.w;*(i32*)(hdr+22)=fb.h;*(u16*)(hdr+26)=1;*(u16*)(hdr+28)=24;*(u32*)(hdr+34)=row*fb.h;fwrite(hdr,1,54,f);std::vector<u8> line(row);for(int y=fb.h-1;y>=0;y--){for(int x=0;x<fb.w;x++){u32 c=fb.color[y*fb.w+x];line[x*3]=getb(c);line[x*3+1]=getg(c);line[x*3+2]=getr(c);}fwrite(line.data(),1,row,f);}fclose(f);return true;}
+void drawText(Framebuffer& fb,const Font& f,int x,int y,const std::string& s,u32 argb,bool shadow){
+    if(!f.loaded())return;
+    int px=x;
+    for(char c:s){
+        int w=f.glyphWidth(c);
+        for(int gy=0;gy<f.fixedHeight();gy++){
+            for(int gx=0;gx<w;gx++){
+                if(!f.pixel(c,gx,gy))continue;
+                if(shadow){int X=px+gx+1,Y=y+gy+1;if(X>=0&&X<fb.w&&Y>=0&&Y<fb.h)fb.color[Y*fb.w+X]=rgba(0,0,0);}
+                int X=px+gx,Y=y+gy;if(X>=0&&X<fb.w&&Y>=0&&Y<fb.h)fb.color[Y*fb.w+X]=argb;
+            }
+        }
+        px+=f.advance(c);
+    }
+}
 } // namespace dfpsp

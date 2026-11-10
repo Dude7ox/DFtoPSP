@@ -8,6 +8,8 @@
 #include "../src/core/Dungeon.h"
 #include "../src/core/Enemy.h"
 #include "../src/core/SaveGame.h"
+#include "../src/core/Font.h"
+#include "../src/core/SoftwareRenderer.h"
 #include "../src/core/Random.h"
 #include <cassert>
 #include <cmath>
@@ -38,6 +40,36 @@ int main(int argc,char**argv){
     // RLE records: row offsets are relative to the record, table at dataOffset.
     CHECK(loadTexture(vfs,253,0,pal,tex));CHECK(tex.w==17&&tex.h==13);
     CHECK(loadTexture(vfs,253,2,pal,tex));CHECK(loadTexture(vfs,253,15,pal,tex));
+    // Original FONT000?.FNT faces (DFU-compatible): header, metrics, bitfields.
+    {
+        Font font;
+        CHECK(font.load(vfs,"FONT0001.FNT"));
+        CHECK(font.fixedWidth()==14&&font.fixedHeight()==14);
+        CHECK(font.glyphWidth(' ')==13);       // synthesized space: fixedWidth-1
+        CHECK(font.glyphWidth('!')==2);        // glyph 0 == ascii 33
+        CHECK(font.glyphWidth('A')==12);
+        CHECK(font.rows(' ')==nullptr);CHECK(font.rows('A')!=nullptr);
+        for(char c='0';c<='9';c++)CHECK(font.glyphWidth(c)>0);
+        for(char c='A';c<='Z';c++)CHECK(font.glyphWidth(c)>0);
+        CHECK(font.textWidth("")==0);
+        CHECK(font.textWidth("AB")==font.advance('A')+font.advance('B'));
+        CHECK(font.textWidth("ABC")>font.textWidth("AB"));
+        int ink=0;for(int y=0;y<font.fixedHeight();y++)for(int x=0;x<16;x++)if(font.pixel('.',x,y))ink++;
+        CHECK(ink>=1&&ink<=24);                // '.' is a small but real glyph
+        CHECK(!font.pixel(' ',2,2));           // space never has ink
+        // Tiny FONT0003 face loads from the same parser.
+        Font small;CHECK(small.load(vfs,"FONT0003.FNT"));
+        CHECK(small.fixedWidth()==5&&small.fixedHeight()==7);
+        // Blit: white 'A' with shadow lights pixels in the framebuffer.
+        Framebuffer tfb;tfb.resize(80,24);
+        drawText(tfb,font,4,4,"A",rgba(255,255,255),false);
+        int lit=0;for(size_t i=0;i<tfb.color.size();i++)if(tfb.color[i]!=rgba(0,0,0))lit++;
+        CHECK(lit>0);
+        Framebuffer sfb;sfb.resize(80,24);
+        drawText(sfb,font,4,4,"A",rgba(255,255,255),true);
+        int slit=0;for(size_t i=0;i<sfb.color.size();i++)if(sfb.color[i]!=rgba(0,0,0))slit++;
+        CHECK(slit>=lit);                      // the drop shadow only adds pixels
+    }
     Mesh m;CHECK(loadMesh(arch3d,61018,m));CHECK(!m.verts.empty());
     RdbBlock rdb;CHECK(loadRdb(blocks,"B0000001.RDB",rdb));CHECK(!rdb.objects.empty());
     DungeonLayout l;CHECK(loadDungeonLayout(maps,16,18358,l));CHECK(l.blocks.size()==8);

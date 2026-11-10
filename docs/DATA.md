@@ -8,6 +8,10 @@ without a mandatory conversion step.
 - Hash reference: third-party candidate GOG manifest
   `vgrichina/berrry-wine` (`gog-hashes.json`). This is not a publisher signature.
 - `data/MANIFEST.json` records size, SHA-256, and status for every shipped file.
+- `FONT0000.FNT`..`FONT0004.FNT` (classic bitmap UI faces) were taken from the
+  daggerfall-unity repository (`Assets/StreamingAssets/Fonts`, MIT-licensed project
+  redistributing the original files) and verified byte-identical against the copy in
+  `PetrasBartusis/Daggerfall`; the manifest marks them `dual-source-match`.
 
 Important limitations:
 - `BLOCKS.BSA`, `MAPS.BSA`, and `FLATS.CFG` do not match the candidate GOG manifest.

@@ -96,19 +96,34 @@ void drawCharGenScreen(Framebuffer& fb,const CharGenFlow& f,
     const CharacterDoc& d=f.doc;
     switch(f.step){
     case StepRace:{
-        blitImg(fb,0,0,vfs,"TAMRIEL2.IMG",0,pal,false);
-        box(fb,206,4,112,92,0xd0000000);
-        drawText(fb,title,210,6,"RACE",kGold);
-        std::vector<std::string> rows;
-        for(int r=1;r<=kRaceCount;r++)rows.push_back(raceInfo(r)->name);
-        listRows(fb,body,210,18,rows,f.cursor,0,8);
-        box(fb,2,140,316,58,0xd0000000);
+        // Classic province map: the cursor roams Tamriel and the pixel it
+        // stands on selects the race.
+        blitImg(fb,0,0,vfs,"TMAP00I0.IMG",0,pal,false);
+        int id=raceAt(vfs,f.raceX,f.raceY);
+        for(int k=-3;k<=3;k++){
+            if(k==0)continue;
+            int x=f.raceX+k,y=f.raceY;
+            if(x>=0&&x<fb.w)fb.color[(size_t)y*fb.w+x]=kCursor;
+            x=f.raceX;y=f.raceY+k;
+            if(y>=0&&y<fb.h)fb.color[(size_t)y*fb.w+x]=kCursor;
+        }
+        box(fb,2,2,316,12,0xb0000000);
+        center(fb,title,4,"CHOOSE YOUR PROVINCE",kGold);
+        if(id>=1&&id<=kRaceCount)
+            center(fb,body,186,raceInfo(id)->name,kCursor);
+        break;}
+    case StepRaceConfirm:{
+        blitImg(fb,0,0,vfs,"TMAP00I0.IMG",0,pal,false);
+        box(fb,2,60,316,110,0xe0000000);
+        drawText(fb,title,6,64,std::string("THE ")+raceInfo(d.race)->name,kGold);
         std::vector<std::string> ls;
-        for(const std::string& l:text.lines(raceInfo(f.cursor+1)->descriptionId)){
-            std::vector<std::string> w;wrap(body,l,310,w);
+        for(const std::string& l:text.lines(raceInfo(d.race)->descriptionId)){
+            std::vector<std::string> w;wrap(body,l,308,w);
             for(auto&x:w)ls.push_back(x);
         }
-        for(size_t i=0;i<ls.size()&&i<6;i++)drawText(fb,body,6,144+(int)i*9,ls[i],kInk);
+        for(size_t i=0;i<ls.size()&&i<8;i++)drawText(fb,body,6,78+(int)i*9,ls[i],kInk);
+        std::vector<std::string> rows={"Yes","No"};
+        listRows(fb,body,270,150,rows,f.cursor,0,2);
         break;}
     case StepGender:{
         blitImg(fb,0,0,vfs,"CHGN00I0.IMG",0,pal,false);
@@ -116,6 +131,52 @@ void drawCharGenScreen(Framebuffer& fb,const CharGenFlow& f,
         center(fb,title,74,"GENDER",kGold);
         std::vector<std::string> rows={kGenderNames[0],kGenderNames[1]};
         listRows(fb,body,110,86,rows,f.cursor,0,2);
+        break;}
+    case StepClassQuestions:{
+        blitImg(fb,0,0,vfs,"CHGN00I0.IMG",0,pal,false);
+        // The classic shows this on an unrolling scroll (SCRL00I0.GFX); the
+        // scroll art is an RLE animation, so the text panel stands in for it.
+        box(fb,0,110,320,88,0xe860a0c8);
+        box(fb,0,110,320,2,0xff204060);
+        ClassQuestion q;
+        classQuestion(text,f.cq[f.cqAnswered<10?f.cqAnswered:9],q);
+        char buf[48];
+        std::snprintf(buf,sizeof(buf),"Question %d of 10",f.cqAnswered+1);
+        drawText(fb,body,20,114,buf,0xff002040);
+        int y=126;
+        for(size_t i=0;i<q.text.size()&&i<2;i++){
+            std::vector<std::string> w;wrap(body,q.text[i],280,w);
+            for(auto&x:w){drawText(fb,body,20,y,x,0xff000000);y+=9;}
+        }
+        y+=4;
+        for(int a=0;a<3&&y<196;a++){
+            if(a==f.cursor)box(fb,18,y-1,284,10,0xff80c0e0);
+            std::string line=std::string(1,(char)('a'+a))+") ";
+            line+=q.answers[a].empty()?"":q.answers[a][0];
+            drawText(fb,body,20,y,line,a==f.cursor?0xff000000:0xff103050);
+            y+=11;
+        }
+        drawText(fb,body,4,4,"Answer all ten questions and we will recommend a class.",kInk);
+        break;}
+    case StepClassRecommend:{
+        blitImg(fb,0,0,vfs,"CHGN00I0.IMG",0,pal,false);
+        box(fb,30,20,260,160,0xe0000000);
+        if(f.cqRecommended>=0&&f.cqRecommended<(int)classes.size()){
+            char buf[96];
+            std::snprintf(buf,sizeof(buf),"We recommend the class: %s",
+                          classes[(size_t)f.cqRecommended].name.c_str());
+            center(fb,title,26,buf,kGold);
+            std::vector<std::string> ls;
+            for(const std::string& l:text.lines(2100+f.cqRecommended)){
+                std::vector<std::string> w;wrap(body,l,250,w);
+                for(auto&x:w)ls.push_back(x);
+            }
+            for(size_t i=0;i<ls.size()&&i<12;i++)drawText(fb,body,36,44+(int)i*9,ls[i],kInk);
+        }else{
+            center(fb,title,26,"No class matched your answers",kGold);
+        }
+        std::vector<std::string> rows={"Accept","Choose manually"};
+        listRows(fb,body,150,156,rows,f.cursor,0,2);
         break;}
     case StepClass:{
         blitImg(fb,0,0,vfs,"CHGN00I0.IMG",0,pal,false);
@@ -143,13 +204,84 @@ void drawCharGenScreen(Framebuffer& fb,const CharGenFlow& f,
         char buf[64];
         std::snprintf(buf,sizeof(buf),"Hit points per level: %d",d.career.hpPerLevel);
         rows.push_back(buf);
-        for(int i=0;i<3;i++)rows.push_back(std::string("Primary ")+kSkillNames[d.career.primary[i]>=0?d.career.primary[i]:0]+(d.career.primary[i]<0?" (none)":""));
-        for(int i=0;i<3;i++)rows.push_back(std::string("Major   ")+kSkillNames[d.career.major[i]>=0?d.career.major[i]:0]+(d.career.major[i]<0?" (none)":""));
-        for(int i=0;i<6;i++)rows.push_back(std::string("Minor   ")+kSkillNames[d.career.minor[i]>=0?d.career.minor[i]:0]+(d.career.minor[i]<0?" (none)":""));
+        for(int i=0;i<3;i++)rows.push_back(std::string("Primary ")+(d.career.primary[i]>=0?kSkillNames[d.career.primary[i]]:"(none)"));
+        for(int i=0;i<3;i++)rows.push_back(std::string("Major   ")+(d.career.major[i]>=0?kSkillNames[d.career.major[i]]:"(none)"));
+        for(int i=0;i<6;i++)rows.push_back(std::string("Minor   ")+(d.career.minor[i]>=0?kSkillNames[d.career.minor[i]]:"(none)"));
+        rows.push_back("Special Advantages...");
+        rows.push_back("Special Disadvantages...");
         rows.push_back("-- Done --");
-        listRows(fb,body,8,46,rows,f.cursor,0,14);
+        listRows(fb,body,8,44,rows,f.cursor,0,16);
         drawText(fb,title,8,20,"CUSTOM CLASS",kGold);
-        drawText(fb,body,8,184,"Left/Right change, confirm on Done",kDim);
+        drawText(fb,body,8,190,"Left/Right change, confirm to pick",kDim);
+        {
+            int pts=difficultyPoints(d);
+            char pb[48];
+            box(fb,208,40,108,142,0xd0000000);
+            std::snprintf(pb,sizeof(pb),"Difficulty: %d",pts);
+            drawText(fb,body,212,44,pb,pts<0||pts>40?kCursor:kGold);
+            int py=58;
+            for(size_t i=0;i<d.picks.size()&&py<176;i++){
+                std::string nm=d.picks[i].dis?"-":"+";
+                nm+=advLabel(d.picks[i].dis,d.picks[i].prim);
+                if(d.picks[i].sec>=0){
+                    nm+=" (";
+                    nm+=advSubLabel(d.picks[i].dis,d.picks[i].prim,d.picks[i].sec);
+                    nm+=")";
+                }
+                std::snprintf(pb,sizeof(pb)," %d",d.picks[i].cost);
+                nm+=pb;
+                drawText(fb,body,212,py,nm.substr(0,17),d.picks[i].dis?kCursor:kDim);
+                py+=9;
+            }
+        }
+        break;}
+    case StepAdvList:
+    case StepAdvPrimary:
+    case StepAdvSecondary:{
+        blitImg(fb,0,0,vfs,"CUST00I0.IMG",0,pal,false);
+        box(fb,4,14,240,170,0xe0000000);
+        char buf[80];
+        if(f.step==StepAdvList){
+            std::snprintf(buf,sizeof(buf),"SPECIAL %s",f.advDis?"DISADVANTAGES":"ADVANTAGES");
+            drawText(fb,title,8,18,buf,kGold);
+            std::vector<std::string> rows;
+            for(size_t i=0;i<d.picks.size();i++){
+                if(d.picks[i].dis!=f.advDis)continue;
+                std::string nm=advLabel(f.advDis,d.picks[i].prim);
+                if(d.picks[i].sec>=0){
+                    nm+=" (";nm+=advSubLabel(f.advDis,d.picks[i].prim,d.picks[i].sec);nm+=")";
+                }
+                std::snprintf(buf,sizeof(buf),"  %d pts",d.picks[i].cost);
+                nm+=buf;
+                rows.push_back(nm);
+            }
+            rows.push_back("-- Add --");
+            listRows(fb,body,8,34,rows,f.cursor,0,14);
+            std::snprintf(buf,sizeof(buf),"Difficulty points: %d  (limit -12..40)",difficultyPoints(d));
+            drawText(fb,body,8,172,buf,kDim);
+        }else{
+            bool prim=f.step==StepAdvPrimary;
+            std::snprintf(buf,sizeof(buf),"ADD %s %s",f.advDis?"DISADVANTAGE":"ADVANTAGE",
+                          prim?"":"EFFECT");
+            drawText(fb,title,8,18,buf,kGold);
+            int p=f.cursor;
+            std::vector<std::string> rows;
+            if(prim){
+                for(int i=0;i<advCount(f.advDis);i++){
+                    std::snprintf(buf,sizeof(buf),"%-30s %3d pts",advLabel(f.advDis,i),
+                                  advSubCount(f.advDis,i)>0?advCost(f.advDis,i,0):advCost(f.advDis,i,0));
+                    rows.push_back(buf);
+                }
+            }else{
+                int ns=advSubCount(f.advDis,p);
+                for(int i=0;i<ns;i++){
+                    std::snprintf(buf,sizeof(buf),"%-30s %3d pts",advSubLabel(f.advDis,p,i),
+                                  advCost(f.advDis,p,i));
+                    rows.push_back(buf);
+                }
+            }
+            listRows(fb,body,8,34,rows,prim?f.cursor:f.subCursor,0,14);
+        }
         break;}
     case StepBiography:{
         blitImg(fb,0,0,vfs,"CHGN00I0.IMG",0,pal,false);
@@ -239,7 +371,18 @@ void drawCharGenScreen(Framebuffer& fb,const CharGenFlow& f,
             std::snprintf(buf,sizeof(buf),"%-16s %3d",kSkillNames[i],d.skillValues[i]);
             drawText(fb,body,64,y,buf,kDim);y+=9;shown++;
         }
-        center(fb,body,186,"Confirm to begin the game",kCursor);
+        {
+            static const char* kReflexNames[5]={"Very High","High","Average","Low","Very Low"};
+            char fb2[64];
+            int rx=f.cursor==0?1:0,rr=f.cursor==1?1:0;
+            std::snprintf(fb2,sizeof(fb2),"Face %c %d %c",rx?'<':' ',d.faceIndex+1,rx?'>':' ');
+            drawText(fb,body,64,y,fb2,rx?kCursor:kDim);y+=9;
+            int rf=d.reflexes>=0&&d.reflexes<5?d.reflexes:2;
+            std::snprintf(fb2,sizeof(fb2),"Reflexes %c %s %c",rr?'<':' ',kReflexNames[rf],rr?'>':' ');
+            drawText(fb,body,64,y,fb2,rr?kCursor:kDim);y+=9;
+            drawText(fb,body,64,y,f.cursor==2?"> Done":  "  Done",f.cursor==2?kCursor:kDim);
+        }
+        center(fb,body,190,"Confirm Done to begin the game",kCursor);
         break;}
     default:break;
     }

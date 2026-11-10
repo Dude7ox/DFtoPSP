@@ -1,4 +1,5 @@
 #include "CharGen.h"
+#include "ImgFile.h"
 #include "Stream.h"
 #include <algorithm>
 #include <cstring>
@@ -265,6 +266,8 @@ CharacterDoc::CharacterDoc(){
     for(int i=0;i<12;i++)answers[i]=-1;
 }
 int CharacterDoc::spellPoints()const{
+    if(mageryOption>=0&&mageryOption<5)
+        return (int)(attributes[StatIntelligence]*kMageryMult[mageryOption]+0.5f);
     return (int)(attributes[StatIntelligence]*career.advancement+0.5f);
 }
 int CharacterDoc::maxEncumbrance()const{return attributes[StatStrength]*3/2;}
@@ -299,23 +302,250 @@ void finalizeCharacter(CharacterDoc& d){
     d.hp=d.maxHp;
     d.gold=d.biog.goldMod<0?0:d.biog.goldMod;
 }
+// --- class questions (FALL.EXE v1.07.213 answer table via DFU, MIT) ---
+const unsigned char kAnswerTable[120]={
+ 0,2,1, 0,2,1, 0,1,2, 2,0,1, 0,1,2, 1,0,2, 0,1,2, 2,0,1, 0,2,1, 0,1,2,
+ 0,1,2, 0,1,2, 0,2,1, 0,1,2, 1,0,2, 1,2,0, 2,0,1, 1,0,2, 0,1,2, 2,0,1,
+ 1,0,2, 0,1,2, 0,2,1, 2,1,0, 1,0,2, 0,2,1, 2,1,0, 2,0,1, 2,1,0, 2,1,0,
+ 2,0,1, 1,0,2, 0,2,1, 2,1,0, 1,2,0, 2,0,1, 2,0,1, 1,2,0, 0,1,2, 1,2,0};
+bool classQuestion(const TextRsc& t,int index,ClassQuestion& out){
+    out=ClassQuestion();
+    std::vector<std::string> ls=t.subLines(9000,index+1);
+    if(ls.empty())return false;
+    int cur=-1;
+    for(size_t i=0;i<ls.size();i++){
+        const std::string& l=ls[i];
+        std::string s=l;
+        while(!s.empty()&&s[0]==' ')s.erase(s.begin());
+        if(s.size()>2&&(s[0]=='a'||s[0]=='b'||s[0]=='c')&&s[1]==')'){cur=s[0]-'a';s.erase(0,2);
+            while(!s.empty()&&s[0]==' ')s.erase(s.begin());}
+        if(cur<0)out.text.push_back(s);
+        else out.answers[cur].push_back(s);
+    }
+    return !out.text.empty()&&out.answers[0].size()>0;
+}
+void classQuestionsRoll(CharGenFlow& f,DfRandom& rng){
+    bool picked[40]={false};
+    f.cqAnswered=0;f.cqWeights[0]=f.cqWeights[1]=f.cqWeights[2]=0;
+    for(int i=0;i<10;i++){
+        int idx=rng.range(40);
+        while(picked[idx])idx=(idx+1)%40;
+        picked[idx]=true;f.cq[i]=idx;
+    }
+}
+int classQuestionsRecommend(const Vfs& vfs,const int weights[3]){
+    std::vector<u8> d;
+    if(!vfs.readFile("CLASSES.DAT",d)||d.size()<66)return -1;
+    for(int i=0;i<66;i++){
+        size_t o=18+(size_t)i*3;
+        if(o+2>=d.size())break;
+        if(d[o]==weights[0]&&d[o+1]==weights[1]&&d[o+2]==weights[2]){
+            int header=i/4;
+            if(header>=(int)d.size())return -1;
+            u8 r=d[header];
+            if(header>3)r&=0x0f;
+            return r;
+        }
+    }
+    return -1;
+}
+// --- special advantages / disadvantages (costs: DFU difficultyDict, MIT) ---
+struct AdvDef { const char* label; const char* subs[10]; int nSub; int cost[10]; int kind; };
+static const AdvDef kAdv[11]={
+ {"Acute Hearing",{0},0,{1},0},
+ {"Adrenaline Rush",{0},0,{4},1},
+ {"Athleticism",{0},0,{4},2},
+ {"Bonus To Hit",{"Animals","Daedra","Humanoids","Undead"},4,{6,3,6,6},3},
+ {"Expertise In",{0},0,{2},4},          // secondary filled from the skill list
+ {"Immunity To",{0},0,{10},5},
+ {"Increased Magery",{"Spell points = INT x1.5","Spell points = INT x1.75","Spell points = INT x2","Spell points = INT x3","Spell points = INT"},5,{4,6,8,10,2},6},
+ {"Rapid Healing",{"General","In darkness","In light"},3,{4,3,2},7},
+ {"Regenerate Health",{"General","In darkness","In light","While immersed"},4,{14,10,6,2},8},
+ {"Resistance To",{0},0,{5},9},
+ {"Spell Absorption",{"General","In darkness","In light"},3,{14,12,8},10}};
+static const AdvDef kDis[11]={
+ {"Critical Weakness",{0},0,{-14},0},
+ {"Damage",{"From holy places","From sunlight"},2,{-6,-10},1},
+ {"Darkness Powered Magery",{"Lower magic ability in daylight","Unable to use magic in daylight"},2,{-7,-10},2},
+ {"Forbidden Armor Type",{"Chain","Leather","Plate"},3,{-2,-1,-5},3},
+ {"Forbidden Material",{"Adamantium","Daedric","Dwarven","Ebony","Elven","Iron","Mithril","Orcish","Silver","Steel"},10,{-5,-2,-7,-5,-9,-1,-6,-3,-6,-10},4},
+ {"Forbidden Shield Types",{0},0,{-1},5},
+ {"Forbidden Weaponry",{0},0,{-2},6},
+ {"Inability To Regenerate",{0},0,{-14},7},
+ {"Light Powered Magery",{"Lower magic ability in darkness","Unable to use magic in darkness"},2,{-10,-14},8},
+ {"Low Tolerance",{0},0,{-5},9},
+ {"Phobia",{0},0,{-4},10}};
+static const char* kEffectSubs[7]={"Disease","Fire","Frost","Magic","Paralysis","Poison","Shock"};
+static const unsigned kEffectBits[7]={64,8,16,2,1,4,32};
+static const char* kEnemySubs[4]={"Animals","Daedra","Humanoids","Undead"};
+static const char* kMaterialSubs[10]={"Adamantium","Daedric","Dwarven","Ebony","Elven","Iron","Mithril","Orcish","Silver","Steel"};
+static const int kMaterialIdx[10]={6,9,4,7,3,0,5,8,2,1};
+const float kMageryMult[5]={1.0f,1.5f,1.75f,2.0f,3.0f};
+int advCount(bool dis){return 11;}
+const char* advLabel(bool dis,int prim){return (dis?kDis:kAdv)[prim].label;}
+int advSubCount(bool dis,int prim){
+    const AdvDef& d=(dis?kDis:kAdv)[prim];
+    if(d.nSub>0)return d.nSub;
+    if(!dis){switch(d.kind){case 3:return 4;case 4:return 35;case 5:case 9:return 7;default:return 0;}}
+    switch(d.kind){case 0:case 9:return 7;case 10:return 4;default:return 0;}
+}
+const char* advSubLabel(bool dis,int prim,int sec){
+    const AdvDef& d=(dis?kDis:kAdv)[prim];
+    if(d.nSub>0)return d.subs[sec<0?0:(sec>=d.nSub?d.nSub-1:sec)];
+    if(!dis){
+        switch(d.kind){
+        case 3:return kEnemySubs[sec<0?0:(sec>3?3:sec)];
+        case 4:return kSkillNames[sec<0?0:(sec>34?34:sec)];
+        case 5:case 9:return kEffectSubs[sec<0?0:(sec>6?6:sec)];
+        default:return "";}
+    }
+    switch(d.kind){
+    case 0:case 9:return kEffectSubs[sec<0?0:(sec>6?6:sec)];
+    case 10:return kEnemySubs[sec<0?0:(sec>3?3:sec)];
+    default:return "";}
+}
+int advCost(bool dis,int prim,int sec){
+    const AdvDef& d=(dis?kDis:kAdv)[prim];
+    if(d.nSub>0)return d.cost[sec<0?0:(sec>=d.nSub?d.nSub-1:sec)];
+    return d.cost[0];
+}
+int difficultyPoints(const CharacterDoc& d){
+    int sum=0;
+    for(size_t i=0;i<d.picks.size();i++)sum+=d.picks[i].cost;
+    return sum;
+}
+void applyAdvPick(CharacterDoc& d,const AdvPick& p){
+    Career& c=d.career;
+    const AdvDef& def=(p.dis?kDis:kAdv)[p.prim];
+    switch(def.kind){
+    case 5: if(!p.dis)c.immunity|=kEffectBits[p.sec]; else c.weaponArmorShields|=1u<<(8+p.sec); break;
+    case 9: if(!p.dis)c.resistance|=kEffectBits[p.sec]; else c.lowTolerance|=kEffectBits[p.sec]; break;
+    case 0: if(p.dis)c.criticalWeakness|=kEffectBits[p.sec]; break;
+    case 4: if(p.dis)c.forbiddenMaterials|=1u<<kMaterialIdx[p.sec]; break;
+    case 3: if(p.dis)c.weaponArmorShields|=1u<<p.sec; break;          // armor byte
+    case 6: if(p.dis)c.weaponArmorShields|=1u<<(16+p.sec); break;     // weapon byte
+    case 7: if(!p.dis)c.rapidHealing=p.sec+1; else c.regeneration=0; break;
+    case 8: if(!p.dis)c.regeneration=p.sec+1; break;
+    case 10: if(!p.dis)c.spellAbsorption=p.sec+1; break;
+    default: break;
+    }
+    if(!p.dis&&def.kind==6)d.mageryOption=p.sec;
+    if(!p.dis&&def.kind==4&&p.sec>=0&&p.sec<35)d.expertise[p.sec]=1;
+}
+void unapplyAdvPick(CharacterDoc& d,const AdvPick& p){
+    Career& c=d.career;
+    const AdvDef& def=(p.dis?kDis:kAdv)[p.prim];
+    switch(def.kind){
+    case 5: if(!p.dis)c.immunity&=~kEffectBits[p.sec]; else c.weaponArmorShields&=~(1u<<(8+p.sec)); break;
+    case 9: if(!p.dis)c.resistance&=~kEffectBits[p.sec]; else c.lowTolerance&=~kEffectBits[p.sec]; break;
+    case 0: if(p.dis)c.criticalWeakness&=~kEffectBits[p.sec]; break;
+    case 4: if(p.dis)c.forbiddenMaterials&=~(1u<<kMaterialIdx[p.sec]); break;
+    case 3: if(p.dis)c.weaponArmorShields&=~(1u<<p.sec); break;
+    case 6: if(p.dis)c.weaponArmorShields&=~(1u<<(16+p.sec)); break;
+    case 7: if(!p.dis)c.rapidHealing=0; break;
+    case 8: if(!p.dis)c.regeneration=0; break;
+    case 10: if(!p.dis)c.spellAbsorption=0; break;
+    default: break;
+    }
+    if(!p.dis&&def.kind==6)d.mageryOption=-1;
+    if(!p.dis&&def.kind==4&&p.sec>=0&&p.sec<35)d.expertise[p.sec]=0;
+}
 // --- flow ---
 static const int kCustomHpMin=4,kCustomHpMax=30;
+bool racePixel(const Vfs& vfs,int race,int& x,int& y){
+    static ImgFile tam;
+    if(!tam.count()&&!tam.open(vfs,"TAMRIEL2.IMG"))return false;
+    if(!tam.decode(0))return false;
+    const ImgRecord* r=tam.decoded(0);
+    if(!r)return false;
+    for(int py=0;py<r->h;py++)for(int px=0;px<r->w;px++){
+        if(r->idx[(size_t)py*r->w+px]==race){
+            // aim a little inside the province so neighbour pixels agree
+            for(int d=1;d<6;d++){
+                int cx=px+d,cy=py+d;
+                if(cx<r->w&&cy<r->h&&r->idx[(size_t)cy*r->w+cx]==race){x=cx;y=cy;return true;}
+            }
+            x=px;y=py;return true;
+        }
+    }
+    return false;
+}
+static int raceAtCursor(const Vfs& vfs,int x,int y){
+    static ImgFile tam;
+    if(!tam.count()&&!tam.open(vfs,"TAMRIEL2.IMG"))return -1;
+    if(!tam.decode(0))return -1;
+    const ImgRecord* r=tam.decoded(0);
+    if(!r)return -1;
+    if(x<0||y<0||x>=r->w||y>=r->h)return -1;
+    return r->idx[(size_t)y*r->w+x];
+}
 struct CustomField { int kind; int idx; };       // 0 hp, 1 skill slot, 2 advantage, 3 done
+int raceAt(const Vfs& vfs,int x,int y){return raceAtCursor(vfs,x,y);}
 bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& classes,
-                    const BiogFile& biog,const NameGen& names,DfRandom& rng){
+                    const BiogFile& biog,const NameGen& names,DfRandom& rng,const Vfs& vfs){
     int before=f.step;
     f.message.clear();
     switch(f.step){
-    case StepRace:
-        if(act==ActUp||act==ActLeft)f.cursor=(f.cursor+kRaceCount-1)%kRaceCount;
-        else if(act==ActDown||act==ActRight)f.cursor=(f.cursor+1)%kRaceCount;
-        else if(act==ActConfirm){f.doc.race=f.cursor+1;f.step=StepGender;f.cursor=0;}
+    case StepRace:{
+        // Classic province map: the cursor walks TAMRIEL2.IMG and the pixel
+        // index under it is the race id.
+        int stepPx=act==ActLeft||act==ActRight?4:3;
+        if(act==ActUp)f.raceY-=stepPx;
+        else if(act==ActDown)f.raceY+=stepPx;
+        else if(act==ActLeft)f.raceX-=stepPx;
+        else if(act==ActRight)f.raceX+=stepPx;
+        if(f.raceX<2)f.raceX=2;if(f.raceX>317)f.raceX=317;
+        if(f.raceY<2)f.raceY=2;if(f.raceY>197)f.raceY=197;
+        if(act==ActConfirm){
+            int id=raceAtCursor(vfs,f.raceX,f.raceY);
+            if(id>=1&&id<=8){f.doc.race=id;f.step=StepRaceConfirm;f.cursor=0;}
+            else f.message="Choose a province of Tamriel.";
+        }
+        break;}
+    case StepRaceConfirm:
+        if(act==ActUp||act==ActDown)f.cursor^=1;
+        else if(act==ActConfirm){
+            if(f.cursor==0){f.step=StepGender;f.cursor=0;}
+            else{f.step=StepRace;}
+        }else if(act==ActBack)f.step=StepRace;
         break;
     case StepGender:
         if(act==ActUp||act==ActDown)f.cursor^=1;
-        else if(act==ActConfirm){f.doc.gender=f.cursor;f.step=StepClass;f.cursor=0;f.page=0;}
-        else if(act==ActBack){f.step=StepRace;f.cursor=f.doc.race-1;}
+        else if(act==ActConfirm){
+            f.doc.gender=f.cursor;f.step=StepClassQuestions;f.cursor=0;
+            classQuestionsRoll(f,rng);
+        }
+        else if(act==ActBack){f.step=StepRaceConfirm;f.cursor=0;}
+        break;
+    case StepClassQuestions:
+        if(act==ActUp||act==ActLeft)f.cursor=(f.cursor+2)%3;
+        else if(act==ActDown||act==ActRight)f.cursor=(f.cursor+1)%3;
+        else if(act==ActConfirm){
+            f.cqHist[f.cqAnswered]=f.cursor;
+            f.cqWeights[kAnswerTable[f.cq[f.cqAnswered]*3+f.cursor]]++;
+            f.cqAnswered++;
+            if(f.cqAnswered==10){
+                f.cqRecommended=classQuestionsRecommend(vfs,f.cqWeights);
+                f.step=StepClassRecommend;f.cursor=0;
+            }
+        }else if(act==ActBack){
+            if(f.cqAnswered>0){
+                f.cqAnswered--;
+                f.cqWeights[kAnswerTable[f.cq[f.cqAnswered]*3+f.cqHist[f.cqAnswered]]]--;
+                f.cursor=f.cqHist[f.cqAnswered];
+            }else{f.step=StepGender;f.cursor=f.doc.gender;}
+        }
+        break;
+    case StepClassRecommend:
+        if(act==ActUp||act==ActDown)f.cursor^=1;
+        else if(act==ActConfirm){
+            if(f.cursor==0&&f.cqRecommended>=0&&f.cqRecommended<(int)classes.size()){
+                f.doc.classIndex=f.cqRecommended;
+                f.doc.career=classes[(size_t)f.cqRecommended];
+                f.doc.career.custom=false;
+                f.step=StepBiography;f.cursor=0;f.doc.biog.clear();
+            }else{f.step=StepClass;f.cursor=0;f.page=0;}
+        }else if(act==ActBack){f.step=StepClassQuestions;f.cursor=0;}
         break;
     case StepClass:{
         int n=(int)classes.size()+1;              // + custom
@@ -334,20 +564,20 @@ bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& 
                 f.doc.career.hpPerLevel=8;
                 f.step=StepCustom;f.cursor=0;f.subCursor=0;
             }
-        }else if(act==ActBack){f.step=StepGender;f.cursor=f.doc.gender;}
+        }else if(act==ActBack){f.step=StepClassRecommend;f.cursor=0;}
         break;}
     case StepCustom:{
-        // Fields: hp/level, 12 skill slots, done.
-        int slots=12;
-        if(act==ActUp)f.cursor=(f.cursor+slots+1)%(slots+2);
-        else if(act==ActDown)f.cursor=(f.cursor+1)%(slots+2);
+        // Fields: hp/level, 12 skill slots, advantages, disadvantages, done.
+        const int fields=16;
+        if(act==ActUp)f.cursor=(f.cursor+fields-1)%fields;
+        else if(act==ActDown)f.cursor=(f.cursor+1)%fields;
         else if(act==ActLeft||act==ActRight){
             int dir=act==ActRight?1:-1;
             if(f.cursor==0){
                 f.doc.career.hpPerLevel+=dir;
                 if(f.doc.career.hpPerLevel<kCustomHpMin)f.doc.career.hpPerLevel=kCustomHpMin;
                 if(f.doc.career.hpPerLevel>kCustomHpMax)f.doc.career.hpPerLevel=kCustomHpMax;
-            }else if(f.cursor<=slots){
+            }else if(f.cursor<=12){
                 int slot=f.cursor-1;
                 int& target=slot<3?f.doc.career.primary[slot]
                     :slot<6?f.doc.career.major[slot-3]:f.doc.career.minor[slot-6];
@@ -356,11 +586,61 @@ bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& 
                 if(target>34)target=-1;
             }
         }else if(act==ActConfirm){
-            // The classic ships no biography file for custom careers, so a
-            // custom class proceeds straight to the bonus rolls.
-            if(f.cursor==slots+1){f.step=StepBonusStats;f.cursor=0;f.doc.biog.clear();
-                rollCharacter(f.doc,rng);}
+            if(f.cursor==13){f.step=StepAdvList;f.cursor=0;f.advDis=false;}
+            else if(f.cursor==14){f.step=StepAdvList;f.cursor=0;f.advDis=true;}
+            else if(f.cursor==15){
+                // The classic ships no biography file for custom careers, so a
+                // custom class proceeds straight to the bonus rolls.
+                f.step=StepBonusStats;f.cursor=0;f.doc.biog.clear();
+                rollCharacter(f.doc,rng);
+            }
         }else if(act==ActBack){f.step=StepClass;f.cursor=(int)classes.size();}
+        break;}
+    case StepAdvList:{
+        int n=0;
+        for(size_t i=0;i<f.doc.picks.size();i++)if(f.doc.picks[i].dis==f.advDis)n++;
+        if(act==ActUp)f.cursor=(f.cursor+n)%(n+1);
+        else if(act==ActDown)f.cursor=(f.cursor+1)%(n+1);
+        else if(act==ActConfirm){
+            if(f.cursor==n){f.step=StepAdvPrimary;f.cursor=0;}
+            else{
+                int seen=0;
+                for(size_t i=0;i<f.doc.picks.size();i++){
+                    if(f.doc.picks[i].dis!=f.advDis)continue;
+                    if(seen==f.cursor){unapplyAdvPick(f.doc,f.doc.picks[i]);
+                        f.doc.picks.erase(f.doc.picks.begin()+i);break;}
+                    seen++;
+                }
+                if(f.cursor>n-1)f.cursor=n>0?n-1:0;
+            }
+        }else if(act==ActBack){f.step=StepCustom;f.cursor=f.advDis?14:13;}
+        break;}
+    case StepAdvPrimary:
+        if(act==ActUp)f.cursor=(f.cursor+advCount(f.advDis)-1)%advCount(f.advDis);
+        else if(act==ActDown)f.cursor=(f.cursor+1)%advCount(f.advDis);
+        else if(act==ActConfirm){
+            int ns=advSubCount(f.advDis,f.cursor);
+            if(ns>0){f.step=StepAdvSecondary;f.subCursor=0;}
+            else{
+                AdvPick p;p.prim=f.cursor;p.sec=-1;p.dis=f.advDis;
+                p.cost=advCost(f.advDis,f.cursor,0);
+                if(difficultyPoints(f.doc)+p.cost<-12||difficultyPoints(f.doc)+p.cost>40)
+                    f.message="Difficulty points must stay within -12..40.";
+                else{applyAdvPick(f.doc,p);f.doc.picks.push_back(p);f.step=StepAdvList;f.cursor=0;}
+            }
+        }else if(act==ActBack){f.step=StepAdvList;f.cursor=0;}
+        break;
+    case StepAdvSecondary:{
+        int ns=advSubCount(f.advDis,f.cursor);
+        if(act==ActUp)f.subCursor=(f.subCursor+ns-1)%ns;
+        else if(act==ActDown)f.subCursor=(f.subCursor+1)%ns;
+        else if(act==ActConfirm){
+            AdvPick p;p.prim=f.cursor;p.sec=f.subCursor;p.dis=f.advDis;
+            p.cost=advCost(f.advDis,f.cursor,f.subCursor);
+            if(difficultyPoints(f.doc)+p.cost<-12||difficultyPoints(f.doc)+p.cost>40)
+                f.message="Difficulty points must stay within -12..40.";
+            else{applyAdvPick(f.doc,p);f.doc.picks.push_back(p);f.step=StepAdvList;f.cursor=0;}
+        }else if(act==ActBack){f.step=StepAdvPrimary;f.cursor=0;}
         break;}
     case StepBiography:{
         int qi=f.cursor/1;                        // one cursor over questions*answers
@@ -453,7 +733,18 @@ bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& 
         else if(act==ActBack){f.step=StepFace;f.cursor=f.doc.faceIndex;}
         break;
     case StepSummary:
-        if(act==ActConfirm){f.step=StepDone;finalizeCharacter(f.doc);}
+        // Fields: face, reflexes, done - the classic summary screen lets the
+        // player revisit both before accepting the character.
+        if(act==ActUp)f.cursor=(f.cursor+2)%3;
+        else if(act==ActDown)f.cursor=(f.cursor+1)%3;
+        else if(act==ActLeft||act==ActRight){
+            int dir=act==ActRight?1:-1;
+            if(f.cursor==0)f.doc.faceIndex=(f.doc.faceIndex+dir+10)%10;
+            else if(f.cursor==1)f.doc.reflexes=(f.doc.reflexes+dir+5)%5;
+        }
+        else if(act==ActConfirm){
+            if(f.cursor==2){f.step=StepDone;finalizeCharacter(f.doc);}
+        }
         else if(act==ActBack){f.step=StepName;f.cursor=0;}
         break;
     default:break;
@@ -461,7 +752,7 @@ bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& 
     return f.step!=before;
 }
 void charGenConfirmStep(CharGenFlow& f,const std::vector<Career>& classes,
-                        const BiogFile& biog,const NameGen& names,DfRandom& rng){
-    charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                        const BiogFile& biog,const NameGen& names,DfRandom& rng,const Vfs& vfs){
+    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
 }
 } // namespace dfpsp

@@ -276,7 +276,7 @@ int main(int argc,char**argv){
         CHECK(back.dungeonName==l.name);
         CHECK(back.spawnedKeys.size()==sd.spawnedKeys.size());
         CHECK(back.player.lockpick==31);CHECK(back.player.xp==42);CHECK(back.player.gold==43);CHECK(back.player.kills==9);
-        CHECK(back.version==4);
+        CHECK(back.version==5);
         CHECK(back.region==sd.region);CHECK(back.exteriorId==sd.exteriorId);
         // Older saves (v1-v3 layout: no character/item tail) must still load.
         {
@@ -509,6 +509,14 @@ int main(int argc,char**argv){
         CHECK(!rg.empty()&&rg.find(' ')==std::string::npos);   // Redguards carry one name
         TextRsc text;CHECK(text.open(vfs));
         CHECK(text.has(2003)&&text.has(2100)&&text.has(4116));
+        CHECK(!text.subLines(9000,1).empty());
+        {
+            ClassQuestion cq0;CHECK(classQuestion(text,0,cq0));
+            CHECK(!cq0.text.empty()&&cq0.answers[0].size()>0);
+            for(int a=0;a<3;a++)CHECK(kAnswerTable[a]<3);
+            for(int r=1;r<=8;r++){int rx=-1,ry=-1;CHECK(racePixel(vfs,r,rx,ry));
+                CHECK(rx>=0&&ry>=0);}
+        }
         for(int ci=0;ci<18;ci++){
             BiogFile b;CHECK(b.load(vfs,ci));
             CHECK(b.questions.size()==12);
@@ -525,33 +533,72 @@ int main(int argc,char**argv){
             BiogFile biog;CHECK(biog.load(vfs,custom?0:ci));
             DfRandom rng(1000+ci);
             CharGenFlow f;
-            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-            if(!custom){
-                for(int k=0;k<ci;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            {int rx=-1,ry=-1;CHECK(racePixel(vfs,RaceBreton,rx,ry));f.raceX=rx;f.raceY=ry;}
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);        // map pixel
+            CHECK(f.step==StepRaceConfirm);
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);        // yes
+            CHECK(f.step==StepGender);
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+            CHECK(f.step==StepClassQuestions);
+            for(int q=0;q<10;q++){
+                charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+            }
+            CHECK(f.step==StepClassRecommend&&f.cqAnswered==10);
+            CHECK(f.cqRecommended>=0&&f.cqRecommended<18);
+            if(!custom&&f.cqRecommended==ci){
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);    // accept
             }else{
-                for(int k=0;k<18;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-                charGenAdvance(f,ActRight,classes,biog,names,rng);      // hp/level 9
-                for(int k=0;k<12;k++){charGenAdvance(f,ActDown,classes,biog,names,rng);
-                    charGenAdvance(f,ActRight,classes,biog,names,rng);} // skill slots
-                charGenAdvance(f,ActDown,classes,biog,names,rng);       // onto Done
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);    // no -> list
+                CHECK(f.step==StepClass);
+                for(int k=0;k<ci;k++)charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+            }
+            if(custom){
+                CHECK(f.step==StepCustom);
+                charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);      // hp/level 9
+                for(int k=0;k<12;k++){charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                    charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);} // skill slots
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);       // onto Advantages
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+                CHECK(f.step==StepAdvList);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);    // add
+                CHECK(f.step==StepAdvPrimary);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+                if(f.step==StepAdvSecondary){
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+                    CHECK(f.step==StepAdvList);
+                }
+                CHECK(!f.doc.picks.empty()&&f.doc.picks.size()<=7);
+                int pts=difficultyPoints(f.doc);
+                CHECK(pts>=-12&&pts<=40);
+                charGenAdvance(f,ActBack,classes,biog,names,rng,vfs);
+                CHECK(f.step==StepCustom&&f.cursor==13);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);       // onto Done
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+            }else{
+                CHECK(f.step==StepBiography);
             }
             int guard=0;
             while(f.step!=StepDone&&guard++<600){
-                if(f.step==StepBiography)charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                if(f.step==StepBiography)charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
                 else if(f.step==StepBonusStats){
-                    for(int k=0;k<14&&f.doc.bonusPool>0;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
-                    charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                    for(int k=0;k<14&&f.doc.bonusPool>0;k++)charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
                 }else if(f.step==StepBonusSkills){
                     for(int k=0;k<80&&(f.doc.skillPool[0]+f.doc.skillPool[1]+f.doc.skillPool[2])>0;k++){
-                        charGenAdvance(f,ActRight,classes,biog,names,rng);
-                        charGenAdvance(f,ActDown,classes,biog,names,rng);
+                        charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                        charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
                     }
-                    charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-                }else charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+                }else if(f.step==StepSummary){
+                    charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                    charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+                }else charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
             }
             CHECK(f.step==StepDone);
             CharacterDoc& d=f.doc;
@@ -573,7 +620,7 @@ int main(int argc,char**argv){
             for(size_t i=0;i<inv.items.size();i++)sd.items.push_back(fromItem(inv.items[i]));
             CHECK(writeSave("/tmp/dfpsp_test_save.bin",sd));
             SaveData rd;CHECK(readSave("/tmp/dfpsp_test_save.bin",rd));
-            CHECK(rd.version==4&&rd.character.valid);
+            CHECK(rd.version==5&&rd.character.valid);
             CHECK(rd.character.name==d.name);
             CHECK(rd.character.career.hpPerLevel==d.career.hpPerLevel);
             CHECK(rd.items.size()==inv.items.size());

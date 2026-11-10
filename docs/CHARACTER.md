@@ -6,15 +6,16 @@ files below changes what the port shows, exactly like in classic Daggerfall.
 
 | Screen | Original art | Original data |
 |---|---|---|
-| Race select | `TAMRIEL2.IMG` | `TEXT.RSC` 2000-2007 race texts |
+| Race select | `TMAP00I0.IMG` (+`TAMRIEL2.IMG` index map) | `TEXT.RSC` 2000-2007 race texts, spoken ids 209-216 |
 | Gender / class select | `CHGN00I0.IMG` | `CLASS00-17.CFG`, `TEXT.RSC` 2100+class |
-| Custom class | `CUST00I0.IMG` | hit points 4-30, skill slots (classic limits) |
+| Class questions | `CHGN00I0.IMG` (scroll panel) | `TEXT.RSC` 9000 (40 questions), `CLASSES.DAT` |
+| Custom class | `CUST00I0.IMG` | hit points 4-30, skill slots, adv/dis tables |
 | Biography | `CHGN00I0.IMG` | `BIOG00-17T0.TXT` (12 questions, effect commands) |
 | Bonus attributes | `CHAR02I0.IMG` | rolled stats + free pool 6-14 |
 | Bonus skills | `CHAR03I0.IMG` | 28/18/13 bases + 6 points per skill group |
 | Face | `CHAR01I0.IMG` + `FACE0rI0.CIF` / `FACE1rI0.CIF` | ten heads per race and gender |
 | Name | `CHAR00I0.IMG` | `NAMEGEN.DAT` (11 banks of name parts) |
-| Summary | `CHAR04I0.IMG` | the finished character document |
+| Summary | `CHAR04I0.IMG` | finished document + reflexes 0-4 and face revisit |
 | Inventory | `INVE00I0.IMG` | item icons from `TEXTURE.*` archives |
 | Paper doll | `SCBG0rI0.IMG`, `BODY0r/1rI0/I1.IMG` | worn item art from `TEXTURE.*` |
 
@@ -44,6 +45,34 @@ Screenshots: `docs/chargen.png` (host render of the whole flow),
 - `src/core/PaperDoll.{h,cpp}` - the doll: nude body, clothed halves when the
   torso/legs are uncovered, race head, cloak interiors and worn items in
   classic draw order, plus the pixel-accurate click test.
+
+## Classic details completed in this increment
+
+- **Province map**: the race step now walks the cursor over `TMAP00I0.IMG` and
+  decodes the province from the matching pixel of the index-only
+  `TAMRIEL2.IMG` (pixel value = race id), followed by the classic
+  description dialog and the spoken province id (DAGGER.SND 209-216).
+- **Class questions**: ten of the forty questions of `TEXT.RSC` record 9000
+  are drawn in order; each answer adds one weight to the warrior / rogue /
+  mage column of the classic `kAnswerTable` (FALL.EXE v1.07.213 @0x0059820C).
+  The triple is then looked up in `CLASSES.DAT` (results triples from offset
+  18, header permutation in the first 18 bytes) exactly like the original,
+  and the found class is offered in the accept / choose-manually dialog.
+  Every accepted answer plays `SoundClips.Ignite` (DAGGER.SND 16).
+- **Special advantages / disadvantages**: the custom-class screen offers the
+  eleven classic advantages and eleven disadvantages with their
+  `difficultyDict` point costs (increased magery x1/x1.5/x1.75/x2/x3 =
+  2/4/6/8/10, immunity 10, regenerate health 14/10/6/2, forbidden material per
+  material, phobia 4, critical weakness -14, ...), at most seven picks and a
+  difficulty total clamped to -12..40. Picks mutate the career exactly where
+  `CLASS??.CFG` stores them (resistance/immunity bits, forbidden materials,
+  weapon/armor/shield bytes, rapid healing, regeneration, spell absorption,
+  attack modifier, expertise skills) and are saved in the save file.
+- **Reflexes**: the summary screen revisits face and reflexes
+  (Very High / High / Average / Low / Very Low; critical chance
+  `50-10*(reflex-2)` %) before accepting the character.
+- **Save format v5** stores reflexes, the magery option and the full
+  advantage pick list; readers still accept v1-v4.
 
 ## Derived numbers (classic formulas)
 

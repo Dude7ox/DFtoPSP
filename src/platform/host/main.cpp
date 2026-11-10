@@ -71,35 +71,88 @@ int main(int argc,char**argv){
         Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);
         DfRandom rng((u32)cgSeed);
         BiogFile biog;biog.load(vfs,cgClass);
-        CharGenFlow f;
-        for(int k=0;k<cgRace-1;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
-        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-        if(cgGender){charGenAdvance(f,ActDown,classes,biog,names,rng);}
-        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
-        for(int k=0;k<cgClass;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
-        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
         Framebuffer fb;fb.resize(320,200);
-        const char* stepNames[]={"race","gender","class","custom","biography","bonusStats","bonusSkills","face","name","summary","done"};
-        int guard=0,shot=0;
+        CharGenFlow f;
+        int shot=0;
+        auto shoot=[&](const char* nm){
+            drawCharGenScreen(fb,f,classes,biog,text,vfs,pal,body,title);
+            if(!chargenPrefix.empty()){
+                char path[256];snprintf(path,sizeof(path),"%s_%02d_%s.bmp",chargenPrefix.c_str(),shot,nm);
+                writeBmp(path,fb);
+            }
+            shot++;
+        };
+        {int rx=160,ry=100;racePixel(vfs,cgRace,rx,ry);f.raceX=rx;f.raceY=ry;}
+        shoot("race");
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);   // map -> province?
+        shoot("raceConfirm");
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);   // yes -> gender
+        shoot("gender");
+        if(cgGender){charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);}
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);   // gender -> questions
+        shoot("classQuestions");
+        for(int q=0;q<10;q++){
+            charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+        }
+        shoot("classRecommend");
+        if(f.step==StepClassRecommend&&f.cqRecommended==cgClass&&cgClass>=0&&cgClass<(int)classes.size()){
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);   // accept recommendation
+        }else{
+            if(f.step==StepClassRecommend){
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);   // no -> class list
+                shoot("class");
+            }
+            for(int k=0;k<cgClass;k++)charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
+        }
+        const char* stepNames[]={"race","raceConfirm","gender","classQuestions","classRecommend","class",
+            "custom","advList","advPrimary","advSecondary","biography","bonusStats","bonusSkills",
+            "face","name","summary","done"};
+        int guard=0;bool advVisited=false;
         while(f.step!=StepDone&&guard++<400){
             drawCharGenScreen(fb,f,classes,biog,text,vfs,pal,body,title);
             char path[256];snprintf(path,sizeof(path),"%s_%02d_%s.bmp",chargenPrefix.c_str(),shot,stepNames[f.step]);
             if(!chargenPrefix.empty())writeBmp(path,fb);
             fprintf(stderr,"step %s\n",stepNames[f.step]);
             shot++;
-            if(f.step==StepBiography){charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            if(f.step==StepCustom){
+                if(!advVisited){
+                    for(int k=0;k<12;k++){charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                        charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);}
+                    charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);   // advantages row
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs); // -> list
+                    continue;
+                }
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);       // -> done
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            if(f.step==StepAdvList){
+                if(!advVisited){advVisited=true;
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs); // -> primary
+                }else{
+                    charGenAdvance(f,ActBack,classes,biog,names,rng,vfs);    // -> custom row 13
+                }
+                continue;}
+            if(f.step==StepAdvPrimary||f.step==StepAdvSecondary){
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            if(f.step==StepBiography){charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
             if(f.step==StepBonusStats){
-                for(int k=0;k<4;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+                for(int k=0;k<4;k++)charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
             if(f.step==StepBonusSkills){
-                for(int g=0;g<3;g++){for(int k=0;k<2;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
-                    charGenAdvance(f,ActDown,classes,biog,names,rng);}
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
-            if(f.step==StepFace){charGenAdvance(f,ActRight,classes,biog,names,rng);
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
-            if(f.step==StepName){charGenAdvance(f,ActDown,classes,biog,names,rng);
-                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
-            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                for(int g=0;g<3;g++){for(int k=0;k<2;k++)charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                    charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);}
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            if(f.step==StepFace){charGenAdvance(f,ActRight,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            if(f.step==StepName){charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            if(f.step==StepSummary){charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActDown,classes,biog,names,rng,vfs);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);continue;}
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng,vfs);
         }
         CharacterDoc& d=f.doc;
         Inventory inv;inv.gold=d.gold;

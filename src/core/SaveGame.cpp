@@ -92,6 +92,11 @@ bool writeSave(const std::string& path,const SaveData& d){
         w.pi32(ch.career.rapidHealing);w.pi32(ch.career.regeneration);w.pi32(ch.career.spellAbsorption);w.pi32(ch.career.attackModifier);
         w.pu32(ch.career.forbiddenMaterials);w.pu32(ch.career.weaponArmorShields);
         w.pu8((u8)(ch.career.custom?1:0));
+        w.pi32(ch.reflexes);w.pi32(ch.mageryOption);
+        w.pu32((u32)ch.pickPrim.size());
+        for(size_t i=0;i<ch.pickPrim.size();i++){
+            w.pi32(ch.pickPrim[i]);w.pi32(ch.pickSec[i]);w.pi32(ch.pickCost[i]);w.pu8((u8)ch.pickDis[i]);
+        }
     }
     w.pu32((u32)d.items.size());
     for(auto& it:d.items){
@@ -118,7 +123,7 @@ bool readSave(const std::string& path,SaveData& d){
     if(memcmp(magic,"DFPS",4)!=0)return false;
     d=SaveData{};
     d.version=r.u32v();
-    if(d.version<1||d.version>4)return false;
+    if(d.version<1||d.version>5)return false;
     d.player.level=r.i32v();d.player.hp=r.i32v();d.player.maxHp=r.i32v();
     d.player.weaponMin=r.i32v();d.player.weaponMax=r.i32v();d.player.skill=r.i32v();d.player.armor=r.i32v();
     if(d.version>=2){d.player.lockpick=r.i32v();d.player.xp=r.i32v();d.player.gold=r.i32v();}
@@ -170,6 +175,14 @@ bool readSave(const std::string& path,SaveData& d){
             ch.career.rapidHealing=r.i32v();ch.career.regeneration=r.i32v();ch.career.spellAbsorption=r.i32v();ch.career.attackModifier=r.i32v();
             ch.career.forbiddenMaterials=r.u32v();ch.career.weaponArmorShields=r.u32v();
             ch.career.custom=r.u8v()!=0;
+            if(d.version>=5){
+                ch.reflexes=r.i32v();ch.mageryOption=r.i32v();
+                u32 np=r.u32v();if(!r.ok||np>64)return false;
+                for(u32 i=0;i<np;i++){
+                    ch.pickPrim.push_back(r.i32v());ch.pickSec.push_back(r.i32v());
+                    ch.pickCost.push_back(r.i32v());ch.pickDis.push_back(r.u8v());
+                }
+            }
         }
         u32 ni=r.u32v();
         if(!r.ok||ni>100000)return false;
@@ -205,6 +218,11 @@ SavedCharacter fromCharacter(const CharacterDoc& d){
     c.valid=true;
     c.race=d.race;c.gender=d.gender;c.classIndex=d.classIndex;c.biographyIndex=d.biographyIndex;
     c.faceIndex=d.faceIndex;c.name=d.name;
+    c.reflexes=d.reflexes;c.mageryOption=d.mageryOption;
+    for(size_t i=0;i<d.picks.size();i++){
+        c.pickPrim.push_back(d.picks[i].prim);c.pickSec.push_back(d.picks[i].sec);
+        c.pickCost.push_back(d.picks[i].cost);c.pickDis.push_back(d.picks[i].dis?1:0);
+    }
     for(int i=0;i<8;i++){c.attributes[i]=d.attributes[i];c.rolledAttributes[i]=d.rolledAttributes[i];}
     c.bonusPool=d.bonusPool;
     for(int i=0;i<35;i++)c.skillValues[i]=d.skillValues[i];
@@ -216,6 +234,12 @@ SavedCharacter fromCharacter(const CharacterDoc& d){
 void toCharacter(const SavedCharacter& s,CharacterDoc& d){
     d.race=s.race;d.gender=s.gender;d.classIndex=s.classIndex;d.biographyIndex=s.biographyIndex;
     d.faceIndex=s.faceIndex;d.name=s.name;
+    d.reflexes=s.reflexes;d.mageryOption=s.mageryOption;
+    d.picks.clear();
+    for(size_t i=0;i<s.pickPrim.size();i++){
+        AdvPick p;p.prim=s.pickPrim[i];p.sec=s.pickSec[i];p.cost=s.pickCost[i];p.dis=s.pickDis[i]!=0;
+        d.picks.push_back(p);
+    }
     for(int i=0;i<8;i++){d.attributes[i]=s.attributes[i];d.rolledAttributes[i]=s.rolledAttributes[i];}
     d.bonusPool=s.bonusPool;
     for(int i=0;i<35;i++)d.skillValues[i]=s.skillValues[i];

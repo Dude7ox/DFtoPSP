@@ -765,6 +765,12 @@
    "status": "mirror-match"
   },
   {
+   "file": "MAGE.CEL",
+   "size": 27206,
+   "sha256": "47314ef76a02f0ed9461098b02807eedef5f4d9e1f7963e21dcb48a4f3898e90",
+   "status": "manifest-match"
+  },
+  {
    "file": "MAPS.BSA",
    "size": 22129312,
    "sha256": "8b5550bfcac03b6f605842568fdbfb7cc6bbed7ace5999c33c900ad286fc24be",
@@ -787,6 +793,12 @@
    "size": 8378,
    "sha256": "1229719909c8109ba610d41648f949c0c0e491b0d6daf9707e852c8e19348f38",
    "status": "mirror-match"
+  },
+  {
+   "file": "ROGUE.CEL",
+   "size": 34028,
+   "sha256": "e5a73e78df1537d425163fccc3a223d1c23700fe3e4d257da1f2f190b4f9393d",
+   "status": "manifest-match"
   },
   {
    "file": "SCBG00I0.IMG",
@@ -841,6 +853,18 @@
    "size": 24762,
    "sha256": "cc33cbd1130e7709cf37e38f68b4cb4a2b206c114906dd90bad8b1440aa81c3c",
    "status": "mirror-match"
+  },
+  {
+   "file": "SCRL00I0.GFX",
+   "size": 50010,
+   "sha256": "e194c66a731e17984ad15dc9b7441a6ee926f1deb407ee86240fb6df23f3b41c",
+   "status": "manifest-match"
+  },
+  {
+   "file": "SCRL01I0.GFX",
+   "size": 48866,
+   "sha256": "67d1947c28f8fd1b23a8d01205b8f266239f762d47ea10d9d7725aa990708915",
+   "status": "manifest-match"
   },
   {
    "file": "TAMRIEL2.IMG",
@@ -3679,6 +3703,12 @@
    "size": 64000,
    "sha256": "741b0c1e00344b962bf1c203ed4d3b0a8efa16e132082ff2f2ea1b94f508aaac",
    "status": "mirror-match"
+  },
+  {
+   "file": "WARRIOR.CEL",
+   "size": 38568,
+   "sha256": "2ae805efd5ff178cedb62e91187f79646bcccf8ae7d9d6784b3d2e86b4a24b60",
+   "status": "manifest-match"
   }
  ]
 }

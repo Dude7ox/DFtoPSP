@@ -17,10 +17,10 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Single-block load: `B0000001.RDB` -> 1128 world triangles, 36 model instances,
   12 gameplay flats, 4 action doors.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
-- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 460 checked, 0 bad.
+- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 462 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 506,236 bytes (culling build, stripped)
-  - SHA-256: `cfe5e537f9a855a10c4563533a300f3542f20bf1b76c733ff831e4e7f7a175e8`
+  - `EBOOT.PBP`: 560,572 bytes (audio build, stripped)
+  - SHA-256: `621b6b7d7fa60155b031af9bcca3279b96d193745456080367862e5820a5c927`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -43,6 +43,26 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
   wall line-of-sight, encounter rolls, simulation stability, a line-of-sight-verified
   melee kill with XP/gold award, lockpick success rates, FNT metrics/bitfields/blits,
   and the save/load round trip (format v2; v1 saves remain readable).
+
+- Audio (see `docs/AUDIO.md`): `MIDI.BSA` (131 HMI songs) parses track-by-track -
+  PPQN 480, 120 ticks/s, 104,827 notes across the corpus, every track reaching its
+  end-of-track meta; `DAGGER.SND` (459 records) yields the classic 8-bit unsigned
+  mono 11025 Hz samples, addressed by record index (`SfxId` mirrors DFU's
+  `SoundClips` enum; per-monster move/bark/attack triples are baked into
+  `src/core/EnemyData.cpp`).
+- Synthesizer: 28 voices (22 music + 6 samples) at 22050 Hz stereo. A synthetic A4
+  measures 440 Hz dominant with both neighbouring semitones more than 5x lower,
+  `D1.HMI` at t~24 s measures 65.41 Hz for its written C2, two independent synths
+  render bit-identical PCM, and 60 s renders peak at 15450-26113 with no clipping.
+- Mix cost on this host (Xeon 2.60 GHz, `-O2`): 60 s of `D1.HMI` mixed in 0.172 s
+  wall (348x realtime), the dense `TAVERN.HMI` in 0.231 s (260x realtime).
+- Gameplay cues are spatialised: volume `110 - 70*d/2200` clamped to `[25,110]`,
+  pan +-90 deg from the camera right vector. Which swing/impact sample plays is
+  rolled on a separate cosmetic RNG, so classic combat rolls stay byte-identical
+  with earlier builds.
+- `docs/audio.wav`: 16 s of `DUNGEON.HMI` with a swing, impact, rat bark, footsteps,
+  a door, a player hit and a body fall staged on a timeline by the host renderer
+  (peak 17923, rms 2933).
 
 Screenshots from the host software renderer:
 - `docs/slice.png`: single-block view.
@@ -101,6 +121,18 @@ Screenshots from the host software renderer:
   `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
   never land a blow; both now scale to percent and player swings roll to hit
   (0 damage = miss, logged as such).
+- Audio output on device: a dedicated thread (priority `0x12`, 32 KB stack,
+  USER|VFPU) renders 512-frame blocks into a 64-byte-aligned double buffer and
+  feeds `sceAudioSRCChReserve`/`sceAudioSRCOutputBlocking` at 22050 Hz, so the
+  hardware sample-rate converter does the upsampling; firmware without SRC falls
+  back to `sceAudioChReserve` at 44100 Hz. The game thread only pushes cues into a
+  64-slot lock-free ring and never blocks on audio. All six audio imports
+  (`sceAudioSRCChReserve/OutputBlocking/ChRelease`, `sceAudioChReserve/Release`,
+  `sceAudioOutputBlocking`) resolve against `libpspaudio.a`.
+- Music and effects in play: dungeon theme `D{1 + exteriorId % 10}.HMI` (fallback
+  `DUNGEON.HMI`), swing/impact/kill/level-up, monster move/bark/attack, player hurt,
+  body fall, spatialised doors, lockpick grind, alternating footsteps, ~25 s ambience
+  (drips/wind) and a death sound; travelling restarts the theme for the new location.
 - Start writes `SAVE0.DFS` next to the data folder and the game restores it on boot.
 - Boot mounts every existing data candidate as a VFS root (`data/`, `data/ARENA2/`,
   `ms0:`/`ef0:`/`host0:` game-directory variants, nested `ARENA2/`, relative fallbacks);
@@ -111,10 +143,13 @@ Screenshots from the host software renderer:
 
 ## Not validated
 
-- Real PSP execution beyond the boot screen: the previous EBOOT was confirmed to run on
-  PPSSPP and a PSP-3000 up to the missing-data fatal (user report); this build changes the
-  data-root discovery and adds the diagnostics panel, but has not been run on a device yet.
-- Frame rate on hardware.
+- Real PSP execution beyond the boot screen: an earlier EBOOT was confirmed to run on
+  PPSSPP and a PSP-3000 up to the missing-data fatal (user report); later builds changed
+  data-root discovery, added the diagnostics panel, UI windows, travel and audio, but have
+  not been run on a device here.
+- Audio on hardware: SRC channel availability/behaviour, audio-thread priority against the
+  GU renderer, and audible output are unverified; only host-side rendering is measured.
+- Frame rate on hardware with the audio thread running.
 - Long-play stability and memory fragmentation.
 - Full collision robustness across all blocks.
 - GU texture-coordinate convention on real hardware/emulator (implemented from SDK samples,
@@ -122,9 +157,13 @@ Screenshots from the host software renderer:
 
 ## Known gaps
 
-- No inventory, quests, dialogue, audio, spells, automap, overworld or travel
-  yet; the first UI windows (help/character/log) now render in the original
-  faces, and inventory/quest screens can reuse the same panel code.
+- No inventory, quests, dialogue or spells yet; the UI windows
+  (help/character/log/travel/automap) render in the original faces, and
+  inventory/quest screens can reuse the same panel code. Inventory is blocked by
+  the missing `ITEMS.BSA` in the cached data source.
+- Music covers dungeons only: the archive also holds weather and town themes that
+  can be routed once overworld data exists, and the densest theme
+  (`TAVERN.HMI`) steals 8 notes per minute at the 22-voice music budget.
 - Overworld travel is blocked by missing terrain data (`WOODS.WLD` is not part of the
   shipped freeware subset).
 - Only the test dungeon layout is wired into the PSP startup path.

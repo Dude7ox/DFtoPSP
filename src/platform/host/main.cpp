@@ -6,13 +6,18 @@
 #include "../../core/Font.h"
 #include "../../core/Ui.h"
 #include "../../core/Automap.h"
+#include "../../core/Audio.h"
 #include "../../core/SaveGame.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
+#include <algorithm>
+#include <chrono>
 using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
+    std::string music,audioOut,sfxArg,sfxDumpPath;int sfxDumpId=-1,audioRate=22050;double audioSecs=10.0,audioSkip=0.0;bool listSongs=false,listSfx=false;
     std::string uiMode;bool showStats=false;int region=16,exterior=18358;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
@@ -34,12 +39,113 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--kill"))kill=true;
         else if(!strcmp(argv[i],"--ui")&&i+1<argc)uiMode=argv[++i];
         else if(!strcmp(argv[i],"--stats"))showStats=true;
+        else if(!strcmp(argv[i],"--music")&&i+1<argc)music=argv[++i];
+        else if(!strcmp(argv[i],"--audio-out")&&i+1<argc)audioOut=argv[++i];
+        else if(!strcmp(argv[i],"--audio-secs")&&i+1<argc)audioSecs=atof(argv[++i]);
+        else if(!strcmp(argv[i],"--audio-skip")&&i+1<argc)audioSkip=atof(argv[++i]);
+        else if(!strcmp(argv[i],"--audio-rate")&&i+1<argc)audioRate=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--sfx")&&i+1<argc)sfxArg=argv[++i];
+        else if(!strcmp(argv[i],"--sfx-dump")&&i+2<argc){sfxDumpId=atoi(argv[++i]);sfxDumpPath=argv[++i];}
+        else if(!strcmp(argv[i],"--list-songs"))listSongs=true;
+        else if(!strcmp(argv[i],"--list-sfx"))listSfx=true;
         else if(!strcmp(argv[i],"--region")&&i+1<argc)region=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--exterior")&&i+1<argc)exterior=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
     }
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");vfs.loadModList(root);vfs.loadModList(".");
     Bsa arch3d,blocks,maps,monsters;
+    // Audio only path: HMI music from MIDI.BSA and sound effects from
+    // DAGGER.SND, rendered with the same synth the PSP audio thread drives.
+    if(!music.empty()||!audioOut.empty()||!sfxArg.empty()||listSongs||listSfx||sfxDumpId>=0){
+        AudioDirector audio;audio.init(audioRate);
+        bool haveMusic=audio.openMusic(vfs),haveSfx=audio.openSfx(vfs);
+        fprintf(stderr,"audio: MIDI.BSA %s (%zu songs), DAGGER.SND %s (%zu records)\n",
+                haveMusic?"ok":"missing",audio.songCount(),haveSfx?"ok":"missing",audio.sfxCount());
+        if(listSongs){
+            for(size_t i=0;i<audio.songCount();i++){
+                std::vector<u8> data;audio.musicArchive().read((u32)i,data);
+                MidiSong song;bool ok=parseHmiSong(data.data(),data.size(),song);
+                printf("%3zu %-14s %7zu B %s\n",i,audio.songName((int)i).c_str(),data.size(),
+                       ok?([&]{char b[96];snprintf(b,sizeof(b),"%d tracks %5u notes %6.1f s loop %.1f-%.1f s",
+                            song.tracks,song.notes,song.seconds(),
+                            song.loopStartTick*song.secondsPerTick(),song.loopEndTick*song.secondsPerTick());
+                            return std::string(b);}()).c_str()
+                         :("BAD: "+song.error).c_str());
+            }
+            return 0;
+        }
+        if(listSfx){
+            for(size_t i=0;i<audio.sfxCount();i++)
+                printf("%3zu %7d B %5.2f s\n",i,audio.sfx().recordSize((int)i),
+                       (double)audio.sfx().recordSize((int)i)/(double)SFX_SAMPLE_RATE);
+            return 0;
+        }
+        if(sfxDumpId>=0){
+            std::vector<u8> raw;
+            if(!audio.sfx().extract(sfxDumpId,raw)||raw.empty()){fprintf(stderr,"no sfx record %d\n",sfxDumpId);return 1;}
+            std::vector<i16> pcm;AudioDirector::unsigned8ToStereo16(raw.data(),raw.size(),pcm);
+            if(!AudioDirector::writeWav(sfxDumpPath,SFX_SAMPLE_RATE,pcm)){fprintf(stderr,"cannot write %s\n",sfxDumpPath.c_str());return 1;}
+            fprintf(stderr,"sfx %d: %zu samples (%.2f s at %d Hz) -> %s\n",sfxDumpId,raw.size(),
+                    (double)raw.size()/(double)SFX_SAMPLE_RATE,SFX_SAMPLE_RATE,sfxDumpPath.c_str());
+            printf("%s\n",sfxDumpPath.c_str());return 0;
+        }
+        if(!music.empty()){
+            if(!audio.playSongName(music)){fprintf(stderr,"music failed: %s\n",audio.lastError().c_str());return 1;}
+            if(audioSkip>0.0)audio.seekSong(audioSkip);
+            const MidiSong& song=audio.synth().song();
+            fprintf(stderr,"song %s: %d tracks, %u notes, %zu events, %.1f s, loop %.1f-%.1f s, ppqn %u\n",
+                    music.c_str(),song.tracks,song.notes,song.events.size(),song.seconds(),
+                    song.loopStartTick*song.secondsPerTick(),song.loopEndTick*song.secondsPerTick(),song.ppqn);
+            if(audioSkip>0.0)fprintf(stderr,"started at %.1f s into the track\n",audio.synth().songPositionSec());
+        }
+        // --sfx takes "id[@seconds]" entries so a render can stage a swing, an
+        // impact and a door the way the game would fire them.
+        std::vector<std::pair<double,int>> cues;
+        if(!sfxArg.empty()){
+            for(size_t pos=0;pos<sfxArg.size();){
+                size_t comma=sfxArg.find(',',pos);
+                std::string tok=sfxArg.substr(pos,comma==std::string::npos?std::string::npos:comma-pos);
+                size_t at=tok.find('@');
+                int id=atoi(tok.substr(0,at).c_str());
+                double when=at==std::string::npos?0.0:atof(tok.c_str()+at+1);
+                cues.push_back({when,id});
+                if(comma==std::string::npos)break;
+                pos=comma+1;
+            }
+            std::sort(cues.begin(),cues.end());
+        }
+        if(!audioOut.empty()){
+            int rate=audio.synth().sampleRate();
+            size_t total=(size_t)(audioSecs*(double)rate);
+            std::vector<i16> pcm(total*2,0);
+            double sum=0;int peak=0,maxVoices=0;const size_t BLOCK=512;
+            size_t cueIdx=0;
+            auto mixStart=std::chrono::steady_clock::now();
+            for(size_t done=0;done<total;done+=BLOCK){
+                size_t n=std::min(BLOCK,total-done);
+                while(cueIdx<cues.size()&&cues[cueIdx].first*(double)rate<=(double)(done+n)){
+                    if(!audio.playSfxIndex(cues[cueIdx].second))
+                        fprintf(stderr,"sfx %d unavailable\n",cues[cueIdx].second);
+                    cueIdx++;
+                }
+                audio.synth().render(&pcm[done*2],(int)n);
+                int v=audio.synth().activeVoices();if(v>maxVoices)maxVoices=v;
+                for(size_t i=0;i<n*2;i++){int x=pcm[done*2+i];sum+=(double)x*x;int a=x<0?-x:x;if(a>peak)peak=a;}
+            }
+            if(!AudioDirector::writeWav(audioOut,rate,pcm)){fprintf(stderr,"cannot write %s\n",audioOut.c_str());return 1;}
+            auto mixEnd=std::chrono::steady_clock::now();
+            double mixSec=std::chrono::duration<double>(mixEnd-mixStart).count();
+            double rms=total>0?std::sqrt(sum/(double)(total*2)):0.0;
+            fprintf(stderr,"audio: %s %.1f s @ %d Hz stereo, peak %d, rms %.0f, max voices %d, notes %u (cut %u), samples %u (cut %u)\n",
+                    audioOut.c_str(),audioSecs,rate,peak,rms,maxVoices,
+                    audio.synth().notesStarted(),audio.synth().notesCut(),
+                    audio.synth().samplesStarted(),audio.synth().samplesCut());
+            fprintf(stderr,"audio: mixed in %.3f s wall, %.0fx realtime on this host\n",
+                    mixSec,mixSec>0.0?audioSecs/mixSec:0.0);
+            printf("%s\n",audioOut.c_str());
+        }
+        return 0;
+    }
     if(!arch3d.open(vfs,"ARCH3D.BSA")){fprintf(stderr,"ARCH3D.BSA missing\n");return 1;}
     if(!blocks.open(vfs,"BLOCKS.BSA")){fprintf(stderr,"BLOCKS.BSA missing\n");return 1;}
     bool haveMonsters=monsters.open(vfs,"MONSTER.BSA");

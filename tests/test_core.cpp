@@ -12,13 +12,43 @@
 #include "../src/core/Ui.h"
 #include "../src/core/Automap.h"
 #include "../src/core/Cull.h"
+#include "../src/core/Midi.h"
+#include "../src/core/Synth.h"
+#include "../src/core/Sfx.h"
+#include "../src/core/Audio.h"
 #include "../src/core/SoftwareRenderer.h"
 #include "../src/core/Random.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"CHECK failed: %s line %d\n",#x,__LINE__);return 1;}}while(0)
 using namespace dfpsp;
+static const double kPi=3.14159265358979323846;
+// Single frequency magnitude over interleaved stereo samples (left channel).
+static double goertzel(const std::vector<i16>& pcm,size_t start,size_t n,double freq,int rate){
+    double w=2.0*kPi*freq/(double)rate,coeff=2.0*std::cos(w),s1=0,s2=0;
+    for(size_t i=0;i<n&&start+i<pcm.size()/2;i++){
+        double x=(double)pcm[(start+i)*2],s0=x+coeff*s1-s2;s2=s1;s1=s0;
+    }
+    return std::sqrt(s1*s1+s2*s2-coeff*s1*s2)/(double)n;
+}
+static double rms16(const std::vector<i16>& pcm){
+    if(pcm.empty())return 0;double sum=0;
+    for(size_t i=0;i<pcm.size();i++)sum+=(double)pcm[i]*pcm[i];
+    return std::sqrt(sum/(double)pcm.size());
+}
+static int peak16(const std::vector<i16>& pcm){
+    int p=0;for(size_t i=0;i<pcm.size();i++){int a=pcm[i]<0?-(int)pcm[i]:pcm[i];if(a>p)p=a;}return p;
+}
+// Collects the sound effect indices the dungeon asks for.
+struct CueLog : dfpsp::SoundSink {
+    std::vector<int> ids;
+    void play(int soundId,int vol,int pan)override{(void)vol;(void)pan;ids.push_back(soundId);}
+    bool has(int id)const{for(int v:ids)if(v==id)return true;return false;}
+    bool inRange(int lo,int hi)const{for(int v:ids)if(v>=lo&&v<=hi)return true;return false;}
+};
 int main(int argc,char**argv){
     std::string root=argc>1?argv[1]:"data";
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");
@@ -248,6 +278,205 @@ int main(int argc,char**argv){
         CHECK(back.version==3);
         CHECK(back.region==sd.region);CHECK(back.exteriorId==sd.exteriorId);
         remove("test_core_save.dfs");
+    }
+    // --- Audio: HMI music from MIDI.BSA, samples from DAGGER.SND, synth ---
+    {
+        // Both archives are ordinary Daggerfall BSAs: 0x0100 keeps a named
+        // directory, 0x0200 an id/size one, both stored at the end of the file.
+        Bsa midi;CHECK(midi.open(vfs,"MIDI.BSA"));CHECK(midi.count()==131);
+        CHECK(midi.find("D1.HMI")>=0);CHECK(midi.find("DUNGEON.HMI")>=0);CHECK(midi.find("TAVERN.HMI")>=0);
+        std::vector<u8> raw;CHECK(midi.read("D1.HMI",raw));CHECK(raw.size()==19372);
+        CHECK(raw[0]=='H'&&raw[3]=='-'&&raw[11]=='G');
+        MidiSong song;CHECK(parseHmiSong(raw.data(),raw.size(),song));
+        CHECK(song.ok);CHECK(song.tracks==4);
+        CHECK(song.ppqn==480);CHECK(song.tempoUs==4000000);
+        CHECK(song.notes==454);CHECK(song.endTick==26926);
+        // SOS ran HMI songs at four seconds per quarter note, i.e. the uint16 at
+        // 0xD4 (120) ticks per second: the Daggerfall theme lasts about 3:44.
+        CHECK(song.seconds()>220.0&&song.seconds()<230.0);
+        CHECK(song.loopEndTick>song.loopStartTick);
+        // Every note carries a duration and a matching synthesised note off.
+        size_t notes=0,offs=0;u32 prev=0;bool sorted=true;
+        for(auto& e:song.events){
+            if(e.tick<prev)sorted=false;prev=e.tick;
+            if(e.kind==MidiNote){notes++;CHECK(e.dur>0);CHECK(e.d1<128);}
+            else if(e.kind==MidiNoteOff)offs++;
+        }
+        CHECK(sorted);CHECK(notes==song.notes);CHECK(offs==song.notes);
+        // The whole archive parses: 131 songs, every track reaching its EOT.
+        size_t corpusNotes=0;int corpusTracks=0;
+        for(size_t i=0;i<midi.count();i++){
+            std::vector<u8> data;CHECK(midi.read((u32)i,data));
+            MidiSong s;
+            CHECK(parseHmiSong(data.data(),data.size(),s));
+            CHECK(s.ok);CHECK(!s.events.empty());CHECK(s.notes>0);
+            CHECK(s.seconds()>20.0&&s.seconds()<600.0);
+            corpusNotes+=s.notes;corpusTracks+=s.tracks;
+        }
+        CHECK(corpusNotes>100000);CHECK(corpusTracks>900);
+        // A truncated or bogus record is refused instead of reading out of bounds.
+        MidiSong bad;CHECK(!parseHmiSong(raw.data(),64,bad));
+        std::vector<u8> junk(raw);junk[0]='X';CHECK(!parseHmiSong(junk.data(),junk.size(),bad));
+    }
+    {
+        // Synth pitch: a synthetic A4 piano note must peak at 440 Hz and stay
+        // silent before it starts.
+        const int RATE=22050;
+        Synth synth;synth.init(RATE);
+        MidiSong test=makeTestSong(69,0,2.0);
+        CHECK(test.ok);CHECK(test.notes==1);
+        synth.setSong(test);synth.playSong(false);
+        std::vector<i16> pcm((size_t)RATE*4,0);
+        synth.render(pcm.data(),RATE*2);
+        for(int i=0;i<RATE/10;i++)CHECK(pcm[(size_t)i*2]==0&&pcm[(size_t)i*2+1]==0);   // 100 ms of silence
+        size_t at=(size_t)(RATE*0.5);
+        double f440=goertzel(pcm,at,8192,440.0,RATE);
+        double fLow=goertzel(pcm,at,8192,440.0*std::exp2(-1.0/12.0),RATE);
+        double fHigh=goertzel(pcm,at,8192,440.0*std::exp2(1.0/12.0),RATE);
+        double f880=goertzel(pcm,at,8192,880.0,RATE);
+        CHECK(f440>200.0);
+        CHECK(f440>fLow*5.0);CHECK(f440>fHigh*5.0);
+        CHECK(f880<f440);CHECK(f880>f440*0.05);          // the second partial
+        CHECK(synth.notesStarted()==1);
+        int pk=peak16(pcm);CHECK(pk>1000);CHECK(pk<32767);   // audible, not clipped
+        // Two independent synths render bit identical samples.
+        Synth a,b;a.init(RATE);b.init(RATE);
+        a.setSong(test);b.setSong(test);a.playSong(false);b.playSong(false);
+        std::vector<i16> pa((size_t)RATE*2,0),pb((size_t)RATE*2,0);
+        a.render(pa.data(),RATE);b.render(pb.data(),RATE);
+        CHECK(pa==pb);
+        // Real music: the theme renders, keeps polyphony and never clips.
+        Bsa midi;CHECK(midi.open(vfs,"MIDI.BSA"));
+        std::vector<u8> raw;CHECK(midi.read("D1.HMI",raw));
+        Synth real;real.init(RATE);CHECK(real.loadSong(raw.data(),raw.size()));
+        CHECK(real.song().notes==454);
+        real.playSong(true);
+        const int FRAMES=RATE*10;
+        std::vector<i16> music((size_t)FRAMES*2,0);
+        int maxVoices=0;
+        for(int done=0;done+512<=FRAMES;done+=512){
+            real.render(&music[(size_t)done*2],512);
+            int v=real.activeVoices();if(v>maxVoices)maxVoices=v;
+        }
+        CHECK(real.notesStarted()>8);CHECK(maxVoices>0);CHECK(maxVoices<=Synth::kMusicVoices);
+        CHECK(rms16(music)>200.0);CHECK(peak16(music)<32768);
+        CHECK(real.songPositionSec()>9.0);
+        // Looping rewinds the sequencer instead of stopping.
+        Synth loop;loop.init(RATE);loop.loadSong(raw.data(),raw.size());
+        MidiSong tiny=loop.song();tiny.endTick=240;loop.setSong(tiny);   // two seconds
+        loop.playSong(true);
+        std::vector<i16> lp((size_t)RATE*8,0);loop.render(lp.data(),RATE*4);
+        CHECK(!loop.songPlaying()||loop.songPositionSec()<2.1);
+        CHECK(rms16(lp)>0.0);
+    }
+    {
+        // DAGGER.SND: 459 records of raw 8-bit unsigned mono PCM at 11025 Hz.
+        SfxBank bank;CHECK(bank.open(vfs,"DAGGER.SND"));CHECK(bank.count()==459);
+        CHECK(bank.recordSize(0)==39363);
+        CHECK(bank.recordSize(SfxId::SwingHighPitch)==1287);
+        CHECK(bank.recordSize(SfxId::ArenaHitSound)==3112);
+        CHECK(bank.recordSize(SfxId::DungeonDoorOpen)==23320);
+        CHECK(bank.recordSize(99999)==-1);
+        std::vector<u8> swing;CHECK(bank.extract(SfxId::SwingHighPitch,swing));
+        CHECK(swing.size()==1287);
+        // The record starts on the unsigned silence level 128.
+        long sum=0;for(int i=0;i<200;i++)sum+=swing[(size_t)i];
+        CHECK(std::labs(sum/200-128)<=2);
+        SfxClip clip;CHECK(bank.clip(SfxId::SwingHighPitch,clip));
+        CHECK(clip.len==swing.size());CHECK(clip.rate==SFX_SAMPLE_RATE);
+        CHECK(std::memcmp(clip.pcm,swing.data(),swing.size())==0);
+        CHECK(bank.cachedBytes()==swing.size());
+        // A tight budget evicts the oldest record and reports its old pointer so
+        // the synth can stop any voice still reading it.
+        SfxBank small(40000);CHECK(small.open(vfs,"DAGGER.SND"));
+        SfxClip first;CHECK(small.clip(0,first));
+        const u8* firstPtr=first.pcm;CHECK(first.len==39363);
+        SfxClip second;SfxEvicted evicted;CHECK(small.clip(3,second,&evicted));
+        CHECK(evicted.n==1);CHECK(evicted.ptr[0]==firstPtr);
+        CHECK(small.cachedBytes()<=40000);
+        // A sound effect mixed over music raises the level and never clips.
+        AudioDirector audio;audio.init(22050);
+        CHECK(audio.openMusic(vfs));CHECK(audio.openSfx(vfs));
+        CHECK(audio.songCount()==131);CHECK(audio.sfxCount()==459);
+        CHECK(audio.songIndex("TAVERN.HMI")>=0);
+        CHECK(audio.songName(audio.songIndex("TAVERN.HMI"))=="TAVERN.HMI");
+        CHECK(audio.playSongName("TAVERN.HMI"));
+        CHECK(audio.currentSongName()=="TAVERN.HMI");
+        CHECK(audio.playSfxIndex(SfxId::SwingHighPitch));
+        CHECK(audio.synth().samplesStarted()==1);
+        std::vector<i16> mixed((size_t)22050*4,0);
+        audio.synth().render(mixed.data(),22050*2);
+        CHECK(rms16(mixed)>200.0);CHECK(peak16(mixed)<32768);
+        audio.stopSong();CHECK(audio.currentSong()<0);
+        // WAV writer: canonical 44 byte header for 16-bit stereo.
+        std::vector<i16> tiny(2205,7);
+        CHECK(AudioDirector::writeWav("test_audio.wav",22050,tiny));
+        FILE* f=fopen("test_audio.wav","rb");CHECK(f!=nullptr);
+        u8 h[44];CHECK(fread(h,1,44,f)==44);
+        CHECK(std::memcmp(h,"RIFF",4)==0);CHECK(std::memcmp(h+8,"WAVE",4)==0);
+        CHECK(std::memcmp(h+12,"fmt ",4)==0);CHECK(std::memcmp(h+36,"data",4)==0);
+        u32 dataBytes=(u32)h[40]|((u32)h[41]<<8)|((u32)h[42]<<16)|((u32)h[43]<<24);
+        CHECK(dataBytes==tiny.size()*2);
+        u32 riff=(u32)h[4]|((u32)h[5]<<8)|((u32)h[6]<<16)|((u32)h[7]<<24);
+        CHECK(riff==36+dataBytes);
+        u32 rate=(u32)h[24]|((u32)h[25]<<8)|((u32)h[26]<<16)|((u32)h[27]<<24);
+        CHECK(rate==22050);CHECK(h[22]==2);CHECK(h[34]==16);
+        i16 sample=0;CHECK(fread(&sample,2,1,f)==1);CHECK(sample==7);
+        fclose(f);remove("test_audio.wav");
+        // Raw records convert to 16-bit stereo around the 128 midpoint.
+        std::vector<u8> u8pcm={128,0,255,64};
+        std::vector<i16> conv;AudioDirector::unsigned8ToStereo16(u8pcm.data(),u8pcm.size(),conv);
+        CHECK(conv.size()==8);CHECK(conv[0]==0);CHECK(conv[2]==-32768);CHECK(conv[4]==32512);CHECK(conv[6]==-16384);
+    }
+    {
+        // Gameplay wiring: swings, hits, monster voices and lockpicks reach the
+        // sound sink with the classic DAGGER.SND indices.
+        Dungeon d3(vfs,arch3d,blocks,monsters);
+        CHECK(d3.enter(l,3));
+        CueLog cues;d3.setSoundSink(&cues);
+        PlayerState p;p.pos=d3.spawn();p.skill=120;p.weaponMin=20;p.weaponMax=30;
+        Vec3 fwd{std::sin(0.5f),0,std::cos(0.5f)};
+        d3.playerAttack(p,fwd);
+        CHECK(cues.has(SfxId::SwingLowPitch)||cues.has(SfxId::SwingHighPitch));
+        // Put the nearest monster right in front of the player and swing.
+        std::vector<Enemy> es=d3.enemies();
+        CHECK(!es.empty());
+        size_t bi=0;float bd=1e9f;
+        for(size_t i=0;i<es.size();i++){
+            if(es[i].state==EnemyDead)continue;
+            float d=(es[i].pos-p.pos).len();if(d<bd){bd=d;bi=i;}
+        }
+        Enemy& target=es[bi];
+        const EnemyStatic* st=findEnemyStatic(target.mobileId);CHECK(st!=nullptr);
+        target.pos=p.pos+fwd*70.0f;target.flying=false;
+        float fy=d3.floor(target.pos,target.pos.y+96.f);if(fy>-10000.f)target.pos.y=fy;
+        target.aggro=false;target.passive=false;target.seen=true;target.state=EnemyIdle;
+        target.hp=target.maxHp;
+        d3.setEnemies(es,d3.deadKeys(),d3.spawnedKeys());
+        cues.ids.clear();
+        d3.update(p.pos);
+        d3.tickEnemies(0.1f,p,fwd);
+        // A monster that has just noticed the player uses its bark sound.
+        CHECK(cues.has(st->barkSound));
+        cues.ids.clear();
+        bool hit=false;
+        for(int i=0;i<16&&!hit;i++){
+            cues.ids.clear();
+            p.attackCooldown=0.f;
+            d3.playerAttack(p,fwd);
+            hit=cues.inRange(SfxId::Hit1,SfxId::Hit5);
+            if(hit)CHECK(cues.has(st->barkSound));
+        }
+        CHECK(hit);
+        // Lockpicking a locked door raises the classic pick sound.
+        Door door;door.locked=true;
+        cues.ids.clear();
+        d3.pickLock(p,door);
+        CHECK(cues.has(SfxId::ActivateGrind));
+        d3.setSoundSink(nullptr);
+        cues.ids.clear();
+        d3.playerAttack(p,fwd);
+        CHECK(cues.ids.empty());
     }
     printf("core tests passed\n");return 0;
 }

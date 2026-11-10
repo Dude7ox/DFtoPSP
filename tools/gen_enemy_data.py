@@ -42,15 +42,19 @@ def humanize(name):
 def locate(args):
     wanted = {"EnemyBasics.cs": "enemies", "RandomEncounters.cs": "encounters",
               "DaggerfallUnityEnums.cs": "enums"}
+    optional = {"SoundClips.cs": "sounds"}
     found = {}
     if args.files:
         for entry in sorted(os.listdir(args.files)):
             if entry in wanted:
                 found[wanted[entry]] = os.path.join(args.files, entry)
+            elif entry in optional:
+                found[optional[entry]] = os.path.join(args.files, entry)
     elif args.dfu:
         paths = {"enemies": "Assets/Scripts/Utility/EnemyBasics.cs",
                  "encounters": "Assets/Scripts/Utility/RandomEncounters.cs",
-                 "enums": "Assets/Scripts/DaggerfallUnityEnums.cs"}
+                 "enums": "Assets/Scripts/DaggerfallUnityEnums.cs",
+                 "sounds": "Assets/Scripts/SoundClips.cs"}
         for key, rel in paths.items():
             full = os.path.join(args.dfu, rel)
             if os.path.isfile(full):
@@ -165,6 +169,19 @@ def as_index(names, fields, key, default=0):
         return default
 
 
+def as_sound(sounds, fields, key, default=-1):
+    """Resolve `MoveSound = (int)SoundClips.EnemyRatMove` to its record index."""
+    raw = str(fields.get(key, "")).strip()
+    if "." in raw:
+        raw = raw.split(".")[-1]
+    if raw in sounds:
+        return sounds[raw]
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 def frames(fields, key):
     seq = [max(-2, min(127, v)) for v in fields.get(key, [])][:10]
     return seq + [-2] * (10 - len(seq))
@@ -183,6 +200,9 @@ def main():
     enemies_src = read(files["enemies"])
     encounters_src = read(files["encounters"])
     enums_src = read(files["enums"])
+    sound_clips = parse_enum(read(files["sounds"]), "SoundClips") if "sounds" in files else {}
+    if not sound_clips:
+        print("warning: SoundClips.cs unavailable, enemy sounds become -1", file=sys.stderr)
 
     mobile_types = parse_enum(enums_src, "MobileTypes")
     behaviours = parse_enum(enums_src, "MobileBehaviour")
@@ -229,6 +249,9 @@ def main():
             atk3=frames(f, "PrimaryAttackAnimFrames3"),
             chance2=as_int(f, "ChanceForAttack2"), chance3=as_int(f, "ChanceForAttack3"),
             soul=as_int(f, "SoulPts"),
+            moveSnd=as_sound(sound_clips, f, "MoveSound"),
+            barkSnd=as_sound(sound_clips, f, "BarkSound"),
+            atkSnd=as_sound(sound_clips, f, "AttackSound"),
         ))
     rows.sort(key=lambda r: r["id"])
     if len(rows) < 40:
@@ -258,7 +281,7 @@ def main():
         fs.write("const int kEnemyCount = %d;\nconst EnemyStatic kEnemies[kEnemyCount] = {\n" % len(rows))
         for r in rows:
             fs.write('    {%d,"%s",%d,%d,%d,%d,%d,%d,%d,{%d,%d,%d},{%d,%d,%d},%d,%d,%u,%u,%u,%u,'
-                     '{%s},{%s},{%s},%u,%u,%d},\n' % (
+                     '{%s},{%s},{%s},%u,%u,%d,%d,%d,%d},\n' % (
                          r["id"], r["name"].replace('"', "'"), r["archive"], r["female"],
                          r["corpseA"], r["corpseR"], r["level"], r["minHp"], r["maxHp"],
                          r["dmg"][0], r["dmg"][1], r["dmg"][2],
@@ -267,7 +290,8 @@ def main():
                          ",".join(str(v) for v in r["atk1"]),
                          ",".join(str(v) for v in r["atk2"]),
                          ",".join(str(v) for v in r["atk3"]),
-                         r["chance2"], r["chance3"], r["soul"]))
+                         r["chance2"], r["chance3"], r["soul"],
+                         r["moveSnd"], r["barkSnd"], r["atkSnd"]))
         fs.write("};\nconst short kEncounterTables[20][20] = {\n")
         for t in tables:
             fs.write("    {%s},\n" % ",".join(str(v) for v in t))
@@ -286,6 +310,7 @@ HEADER = '''#pragma once
 //   Assets/Scripts/Utility/EnemyBasics.cs
 //   Assets/Scripts/Utility/RandomEncounters.cs
 //   Assets/Scripts/DaggerfallUnityEnums.cs
+//   Assets/Scripts/SoundClips.cs
 // They reproduce enemy combat numbers and encounter tables that live inside the
 // original FALL.EXE rather than in the game data files. Names, hit points per
 // level, attributes and resistances are read from the original MONSTER.BSA at
@@ -311,6 +336,7 @@ struct EnemyStatic {
     signed char attack1[10], attack2[10], attack3[10]; // -2 terminates a sequence
     unsigned char chance2, chance3;
     int soulPts;
+    int moveSound, barkSound, attackSound;   // DAGGER.SND record indices, -1 when silent
 };
 extern const int kEnemyCount;
 extern const EnemyStatic kEnemies[];

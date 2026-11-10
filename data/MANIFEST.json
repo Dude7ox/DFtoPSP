@@ -1,6 +1,6 @@
 {
  "source": "PetrasBartusis/Daggerfall@9f18f5bd0b0c141667d826de7615f178eba9b8a4 + cached classic files",
- "note": "BLOCKS.BSA/MAPS.BSA/FLATS.CFG are original-format but do not match the third-party candidate GOG manifest. WOODS.WLD omitted from repo to fit budget; restore from a full ARENA2 for overworld. FONT0000-0004.FNT come from daggerfall-unity StreamingAssets and are byte-identical to the PetrasBartusis copies (dual-source-match).",
+ "note": "BLOCKS.BSA/MAPS.BSA/FLATS.CFG are original-format but do not match the third-party candidate GOG manifest. WOODS.WLD omitted from repo to fit budget; restore from a full ARENA2 for overworld. MIDI.BSA (HMI music) and DAGGER.SND (sound effects) come from the same cached PetrasBartusis/Daggerfall source; the candidate GOG manifest no longer lists them, so they carry status cached-source. FONT0000-0004.FNT come from daggerfall-unity StreamingAssets and are byte-identical to the PetrasBartusis copies (dual-source-match).",
  "files": [
   {
    "file": "ARCH3D.BSA",
@@ -19,6 +19,12 @@
    "size": 32884997,
    "sha256": "6f5a4c8d9401c1b00ef83eaac9b0c6c32f53cef6eaa4c7d7027deb739bde4795",
    "status": "manifest-mismatch"
+  },
+  {
+   "file": "DAGGER.SND",
+   "size": 7661766,
+   "sha256": "fbb6195ba72f9b2787b659e38afd9ed92d95ca185916d8bdd28ba947b986f3e2",
+   "status": "cached-source"
   },
   {
    "file": "FLATS.CFG",
@@ -61,6 +67,12 @@
    "size": 22129312,
    "sha256": "8b5550bfcac03b6f605842568fdbfb7cc6bbed7ace5999c33c900ad286fc24be",
    "status": "manifest-mismatch"
+  },
+  {
+   "file": "MIDI.BSA",
+   "size": 1232240,
+   "sha256": "bfb1366f8bc65b05aeab06aae8d767f6f9f534152a03102a6c090ec3777d9997",
+   "status": "cached-source"
   },
   {
    "file": "MONSTER.BSA",

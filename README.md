@@ -23,14 +23,20 @@ Implemented:
 - Original `FONT000?.FNT` bitmap faces (DFU-compatible reader): HUD and screenshots
   render in the classic FONT0001 gothic face on host and PSP.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
-- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window (help/character/log), HOME exit.
+- UI windows in the original faces (Select cycles): HELP, CHARACTER sheet, MESSAGE LOG
+  (hits, kills, level-ups, lockpicks) and TRAVEL.
+- Travel: the classic dungeon list of the current region from MAPS.BSA; travel to any
+  entry with the cursor + X; the saved location is restored on boot.
+- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
 - Host software renderer + CLI for validation and screenshots.
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:
-- Inventory, quests, dialogue, audio, spells, automap, overworld/travel.
-- Full campaign data coverage; the shipped data subset loads the test dungeon only.
+- Inventory, quests, dialogue, audio, spells, automap, overworld terrain rendering
+  (the TRAVEL window replaces walking the world map for now).
+- Full campaign data coverage; the shipped subset covers region 16 travel plus the
+  blocks/textures those dungeons reference.
 - Real-PSP / PPSSPP execution validation is still pending in this environment.
 
 ## Install on PSP

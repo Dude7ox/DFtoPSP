@@ -116,7 +116,7 @@ int main(int argc,char**argv){
     }
     for(auto& e:dungeon.enemies()){CHECK(std::isfinite(e.pos.x));CHECK(e.hp>=0&&e.hp<=e.maxHp);}
     // Melee: an enemy placed down the open corridor must die to repeated swings.
-    Vec3 corridor{std::sin(-1.82f),0,std::cos(-1.82f)};
+    Vec3 corridor{0,0,1};   // open hall north of the start marker (validated by probe)
     {
         std::vector<Enemy> es=dungeon.enemies();
         CHECK(!es.empty());
@@ -179,6 +179,29 @@ int main(int argc,char**argv){
         CHECK(death);CHECK(pr.kills==1);
         dungeon.setLog(nullptr);
     }
+    // Travel: region dungeon table and the TRAVEL window list.
+    {
+        std::vector<LocationEntry> tr;CHECK(listRegionDungeons(maps,16,tr));
+        CHECK(tr.size()>=4);
+        bool found=false;for(auto& e:tr)if(e.exteriorId==18358){found=true;CHECK(e.name==l.name);}
+        CHECK(found);
+        int first=0;auto lines=travelLines(tr,0,5,first,l.name);
+        CHECK(lines.size()==5);CHECK(first==0);
+        CHECK(lines[0].rfind("> ",0)==0);
+        int cur=(int)tr.size()-1;auto tail=travelLines(tr,cur,5,first,l.name);
+        CHECK(first==(int)tr.size()-5);CHECK(tail.size()==5);
+        CHECK(tail[4].rfind("> ",0)==0);
+        // Actually travel to another dungeon of the region and back.
+        int other=-1;for(size_t i=0;i<tr.size();i++)if(tr[i].exteriorId!=18358){other=(int)i;break;}
+        CHECK(other>=0);
+        DungeonLayout nl;CHECK(loadDungeonLayout(maps,16,tr[other].exteriorId,nl));
+        CHECK(nl.name==tr[other].name);
+        Dungeon d2(vfs,arch3d,blocks,monsters);
+        CHECK(d2.enter(nl,3));
+        Vec3 s2=d2.spawn();CHECK(std::isfinite(s2.x)&&std::isfinite(s2.z));
+        CHECK(d2.resident().size()>=1);
+        CHECK(dungeon.enter(l,3));   // back home for the save test
+    }
     // Save / load round trip.
     {
         SaveData sd;sd.player=player;sd.player.pos=sp;sd.region=l.region;sd.exteriorId=l.exteriorId;sd.dungeonName=l.name;
@@ -192,6 +215,7 @@ int main(int argc,char**argv){
         CHECK(back.spawnedKeys.size()==sd.spawnedKeys.size());
         CHECK(back.player.lockpick==31);CHECK(back.player.xp==42);CHECK(back.player.gold==43);CHECK(back.player.kills==9);
         CHECK(back.version==3);
+        CHECK(back.region==sd.region);CHECK(back.exteriorId==sd.exteriorId);
         remove("test_core_save.dfs");
     }
     printf("core tests passed\n");return 0;

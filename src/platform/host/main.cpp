@@ -12,7 +12,7 @@
 using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
-    std::string uiMode;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
+    std::string uiMode;int region=16,exterior=18358;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
         else if(!strcmp(argv[i],"--block")&&i+1<argc)block=argv[++i];
@@ -32,6 +32,8 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--hurt"))hurt=true;
         else if(!strcmp(argv[i],"--kill"))kill=true;
         else if(!strcmp(argv[i],"--ui")&&i+1<argc)uiMode=argv[++i];
+        else if(!strcmp(argv[i],"--region")&&i+1<argc)region=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--exterior")&&i+1<argc)exterior=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
     }
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");vfs.loadModList(root);vfs.loadModList(".");
@@ -41,7 +43,7 @@ int main(int argc,char**argv){
     bool haveMonsters=monsters.open(vfs,"MONSTER.BSA");
     if(layout||dungeonMode){
         if(!maps.open(vfs,"MAPS.BSA")){fprintf(stderr,"MAPS.BSA missing\n");return 1;}
-        DungeonLayout l;if(!loadDungeonLayout(maps,16,18358,l)){fprintf(stderr,"layout missing\n");return 1;}
+        DungeonLayout l;if(!loadDungeonLayout(maps,region,exterior,l)){fprintf(stderr,"layout missing\n");return 1;}
         if(layout){printf("%s region=%d ext=%d int=%d type=%d blocks=%zu\n",l.name.c_str(),l.region,l.exteriorId,l.interiorId,l.dungeonType,l.blocks.size());for(auto&b:l.blocks)printf("  %d %d %s%s\n",b.x,b.z,b.name.c_str(),b.start?" START":"");return 0;}
         Dungeon dungeon(vfs,arch3d,blocks,monsters);
         if(!dungeon.enter(l,playerLevel)){fprintf(stderr,"dungeon load failed\n");return 1;}
@@ -111,6 +113,7 @@ int main(int argc,char**argv){
             if(uiMode=="char"){title="CHARACTER";body=charSheetLines(player,l.name);}
             else if(uiMode=="help"){title="HELP";body=helpLines();}
             else if(uiMode=="log"){title="MESSAGE LOG";body=log.lines();tail=true;}
+            else if(uiMode=="travel"){title="TRAVEL";std::vector<LocationEntry> tr;listRegionDungeons(maps,l.region,tr);int first=0;body=travelLines(tr,0,14,first,l.name);}
             if(!body.empty()){
                 int total=(int)body.size();int lines=total>14?14:total;
                 int w=360,wh=4+16+lines*10+6,x=(480-w)/2,y=(272-wh)/2;

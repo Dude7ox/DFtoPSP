@@ -22,6 +22,22 @@ static int dungeonTypeForIndex(const Bsa& maps,int region,u32 k){
     }
     return 255;
 }
+// Full location name for a map id: record names are a truncated tail of it.
+static bool locationName(const Bsa& maps,int region,int exteriorId,std::string& name){
+    char fn[32]; snprintf(fn,sizeof(fn),"MAPNAMES.%03d",region); std::vector<u8> nb; if(!maps.read(fn,nb))return false;
+    Reader nr(nb); u32 nc=nr.u32_(); if(nc>100000)return false;
+    snprintf(fn,sizeof(fn),"MAPPITEM.%03d",region); std::vector<u8> pb; if(!maps.read(fn,pb))return false;
+    for(u32 i=0;i<nc;i++){
+        if((size_t)i*4+4>pb.size())break;
+        u32 off=pb[i*4]|pb[i*4+1]<<8|pb[i*4+2]<<16|u32(pb[i*4+3])<<24;
+        size_t p=(size_t)nc*4+off; if(p+4>pb.size())continue;
+        Reader pr(pb.data()+p,pb.size()-p); u32 doors=pr.u32_(); if(doors>10000)continue;
+        size_t h=p+4+(size_t)doors*6; if(h+35>pb.size())continue;
+        int ext=pb[h+33]|pb[h+34]<<8; if(ext!=exteriorId)continue;
+        Reader xr(nb.data()+4+(size_t)i*32,nb.size()-4-(size_t)i*32); name=xr.str(32); return !name.empty();
+    }
+    return false;
+}
 bool loadDungeonLayout(const Bsa& maps,int region,int exteriorId,DungeonLayout& out){
     char fn[32]; snprintf(fn,sizeof(fn),"MAPDITEM.%03d",region); std::vector<u8> b; if(!maps.read(fn,b))return false;
     Reader r(b); u32 cnt=r.u32_(); if(cnt>100000)return false;
@@ -29,14 +45,39 @@ bool loadDungeonLayout(const Bsa& maps,int region,int exteriorId,DungeonLayout& 
         size_t p=4+(size_t)cnt*8+off; if(p+4>b.size())return false; r.seek(p); u32 doors=r.u32_(); if(doors>10000)return false; size_t h=p+4+(size_t)doors*6; if(h+129>b.size())return false;
         std::string nm; int id; Reader er(b.data()+h,b.size()-h); if(!readRecordElement(er,b.size(),nm,id))return false;
         out=DungeonLayout{};out.region=region;out.exteriorId=exteriorId;out.interiorId=id;out.name=nm;
+        std::string full; if(locationName(maps,region,exteriorId,full))out.name=full;
         out.dungeonType=dungeonTypeForIndex(maps,region,i);
         size_t q=h+112; Reader dr(b.data()+q,b.size()-q); dr.u16_();dr.u32_();dr.u32_(); int bc=dr.u16_(); dr.skip(5);
         if(bc<0||bc>4096)return false;
-        for(int j=0;j<bc;j++){ int x=(int8_t)dr.u8_(),z=(int8_t)dr.u8_(); u16 bits=dr.u16_(); int idx=bits>>11; if(idx>4)return false; char name[16]; snprintf(name,sizeof(name),"%c%07u.RDB","BNWMS"[idx],bits&1023); out.blocks.push_back({x,z,name,(bits&0x400)!=0}); }
+        for(int j=0;j<bc;j++){ int x=(int8_t)dr.u8_(),z=(int8_t)dr.u8_(); u16 bits=dr.u16_(); int idx=bits>>11; if(idx>5)return false; char name[16]; snprintf(name,sizeof(name),"%c%07u.RDB","NWLSBM"[idx],bits&1023); out.blocks.push_back({x,z,name,(bits&0x400)!=0}); }
         if(id==50015&&out.blocks.size()>13)out.blocks[13].z=-2;
         return true;
     }
     return false;
+}
+bool listRegionDungeons(const Bsa& maps,int region,std::vector<LocationEntry>& out){
+    char fn[32]; snprintf(fn,sizeof(fn),"MAPDITEM.%03d",region); std::vector<u8> b; if(!maps.read(fn,b))return false;
+    Reader r(b); u32 cnt=r.u32_(); if(cnt>100000)return false;
+    // Full 32-char location names live in MAPNAMES; record names are truncated.
+    std::vector<u8> nb; std::vector<std::string> names;
+    snprintf(fn,sizeof(fn),"MAPNAMES.%03d",region);
+    if(maps.read(fn,nb)){ Reader nr(nb); u32 nc=nr.u32_(); if(nc<100000){ names.reserve(nc); for(u32 i=0;i<nc;i++) names.push_back(nr.str(32)); } }
+    (void)cnt;(void)r;
+    // Names index MAPPITEM records; MAPDITEM has its own dungeon-only order.
+    char pn[32]; snprintf(pn,sizeof(pn),"MAPPITEM.%03d",region); std::vector<u8> pb; if(!maps.read(pn,pb))return false;
+    for(u32 i=0;i<(u32)names.size();i++){
+        if((size_t)i*4+4>pb.size())break;
+        u32 off=pb[i*4]|pb[i*4+1]<<8|pb[i*4+2]<<16|u32(pb[i*4+3])<<24;
+        size_t p=(size_t)names.size()*4+off; if(p+4>pb.size())continue;
+        Reader pr(pb.data()+p,pb.size()-p); u32 doors=pr.u32_(); if(doors>10000)continue;
+        size_t h=p+4+(size_t)doors*6; if(h+35>pb.size())continue;
+        int ext=pb[h+33]|pb[h+34]<<8;
+        DungeonLayout tmp; if(!loadDungeonLayout(maps,region,ext,tmp))continue;  // cemeteries & co have no interior
+        LocationEntry le; le.exteriorId=ext; le.dungeonType=tmp.dungeonType; le.name=names[i];
+        if(le.name.empty())le.name=tmp.name;
+        out.push_back(std::move(le));
+    }
+    return !out.empty();
 }
 bool findDungeonByName(const Bsa& maps,const std::string& needle,DungeonLayout& out){
     std::string n=lower(needle);

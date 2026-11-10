@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 460 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 1,419,412 bytes (UI-window build)
-  - SHA-256: `bfc0967a50187731bd57a608152645b5133cb96e58281c7d13dedef2d9e4bab7`
+  - `EBOOT.PBP`: 489,068 bytes (travel build, stripped)
+  - SHA-256: `51a788781bdf1fe43f8bd7b4c5ddfaf6f96d5d8509c95e6d1cdbda409e6f53c0`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -77,6 +77,17 @@ Screenshots from the host software renderer:
 - The message log is a 32-line ring fed by hits, misses, kills, level-ups,
   lockpick results and monster damage; the CHARACTER sheet shows level, XP,
   HP, armor, weapon skill, lockpicking, gold, kills and the dungeon name.
+- Travel: `listRegionDungeons()` joins MAPNAMES/MAPPITEM/MAPDITEM into the classic
+  per-region dungeon list (571 enterable locations in region 16); the TRAVEL window
+  scrolls it with the DPad and X enters the selected dungeon (career persists,
+  per-dungeon state resets). Boot restores the saved region/exteriorId location.
+  World simulation pauses while any window is open. `docs/travel.png`.
+- Location names: `loadDungeonLayout()` now resolves the full 32-character MAPNAMES
+  name; the in-record name is only a truncated tail of it.
+- Block-name fix: the RDB letter table followed DFU's `N,W,L,S,B,M` order, not the
+  previously used `B,N,W,M,S`; with the wrong order most dungeons decoded to
+  non-existent blocks (and the test dungeon silently loaded substitute blocks).
+  All sampled region-16 locations now enter, including cemeteries.
 - Combat accuracy fix: `enemySwingHits`/`playerSwingHits` compared
   `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
   never land a blow; both now scale to percent and player swings roll to hit

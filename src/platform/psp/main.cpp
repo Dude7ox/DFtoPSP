@@ -5,6 +5,7 @@
 #include <pspdebug.h>
 #include <pspge.h>
 #include <pspiofilemgr.h>
+#include <unistd.h>
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -55,7 +56,7 @@ int main(int argc,char**argv){
     vfs.loadModList(base);vfs.loadModList(saveDir);vfs.loadModList(".");
     std::string savePath=saveDir+"/SAVE0.DFS";
     auto bootDiag=[&](const char* missing)->std::string{
-        char cwd[128]="?";sceIoGetcwd(cwd,sizeof(cwd));
+        char cwd[128]="?";if(!getcwd(cwd,sizeof(cwd)))cwd[0]='?';
         char line[160];std::string out;
         snprintf(line,sizeof(line),"cwd=%s\n",cwd);out+=line;
         for(auto c:cand){snprintf(line,sizeof(line),"[%s] %s\n",dirExists(c)?"dir":" . ",c);out+=line;}

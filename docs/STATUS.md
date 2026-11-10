@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 455 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 1,392,328 bytes (monsters/combat/save build)
-  - SHA-256: `28cdc5c3145a059d99c6c8dc2ae86c0b35646c4bbac45883db7f5c169b043fc3`
+  - `EBOOT.PBP`: 1,404,148 bytes (boot-fix + progression/lockpicking build)
+  - SHA-256: `b032042d91fb0564ee60d7aecde857d2dba7ddc889252e1f68830d78b81cef35`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -72,8 +72,9 @@ Screenshots from the host software renderer:
 
 ## Not validated
 
-- Real PSP execution.
-- PPSSPP execution.
+- Real PSP execution beyond the boot screen: the previous EBOOT was confirmed to run on
+  PPSSPP and a PSP-3000 up to the missing-data fatal (user report); this build changes the
+  data-root discovery and adds the diagnostics panel, but has not been run on a device yet.
 - Frame rate on hardware.
 - Long-play stability and memory fragmentation.
 - Full collision robustness across all blocks.

@@ -120,6 +120,40 @@ int main(int argc,char**argv){
         std::vector<Enemy> es;for(auto& s:sd.enemies)es.push_back(toEnemy(s));
         dungeon.setEnemies(es,sd.deadKeys,sd.spawnedKeys);
     }
+    // Character creation data: careers, biographies, names and texts all come
+    // from the original files, so mods replace what the screens offer.
+    std::vector<Career> classes;bool haveClasses=loadClasses(vfs,classes);
+    NameGen names;names.open(vfs);
+    TextRsc textRsc;textRsc.open(vfs);
+    CharGenFlow cgFlow;
+    BiogFile cgBiog;int cgBiogClass=-2;
+    DfRandom cgRng((u32)(sceKernelGetSystemTimeWide()&0xffffffffu));
+    Inventory inv;
+    PaperDoll doll;bool dollReady=false;
+    SavedCharacter charSaved;
+    Framebuffer uiFb;uiFb.resize(320,200);
+    int invCat=0,invCur=0;
+    bool chargen=haveClasses&&!restored;
+    auto applyCharacter=[&](){
+        CharacterDoc& d=cgFlow.doc;
+        charSaved=fromCharacter(d);
+        player.level=1;player.xp=0;player.hp=d.maxHp;player.maxHp=d.maxHp;player.gold=d.gold;
+        player.lockpick=d.skillValues[13];player.skill=d.skillValues[30];
+        player.weaponMin=1+d.damageMod();player.weaponMax=3+d.damageMod();
+        player.armor=0;player.kills=0;player.dead=false;
+        inv.items.clear();inv.gold=d.gold;
+        grantBiogItems(inv,d.biog,d.gender,d.race,cgRng);
+        assignStartingGear(inv,d.classIndex,d.classIndex<0,d.gender,d.race,cgRng);
+        for(size_t i=0;i<inv.items.size();i++)
+            if(naturalSlot(inv.items[i])!=SlotNone)inv.equip((int)i);
+        dollReady=doll.load(vfs,d.race,d.gender);
+    };
+    if(restored&&sd.character.valid){
+        charSaved=sd.character;
+        for(auto& s:sd.items)inv.items.push_back(toItem(s));
+        inv.gold=sd.player.gold;
+        dollReady=doll.load(vfs,charSaved.race,charSaved.gender);
+    }
     PspRenderer rr;if(!rr.init(vfs,pal))fatal("PSP GU renderer init failed");
     Font font;font.load(vfs,"FONT0001.FNT");
     Font fontSmall;fontSmall.load(vfs,"FONT0003.FNT");
@@ -143,7 +177,7 @@ int main(int argc,char**argv){
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
-    bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log, 4 travel
+    bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log, 4 travel, 5 map, 6 inventory
     std::vector<LocationEntry> travel;listRegionDungeons(maps,layout.region,travel);int travelCur=0;
     SceCtrlData pad{},old{};u64 last=sceKernelGetSystemTimeWide();float fps=60.f;u32 frames=0;float fpsTimer=0.f;
     float stepTimer=0.f,ambientTimer=18.f,stepToggle=0.f;
@@ -164,7 +198,45 @@ int main(int argc,char**argv){
         if(pad.Buttons&PSP_CTRL_HOME)break;
         u64 now=sceKernelGetSystemTimeWide();float dt=(float)(now-last)/1000000.f;last=now;if(dt>0.1f)dt=0.1f;if(dt<=0)dt=1.f/60.f;
         fpsTimer+=dt;frames++;if(fpsTimer>=0.5f){fps=frames/fpsTimer;frames=0;fpsTimer=0;}
+        // Character creation runs before the world: the classic screens over
+        // the original CHGN/CUST/CHAR/BIOG art, D-pad plus X/O/Square.
+        if(chargen){
+            CharGenAction act=ActConfirm;bool have=true;
+            if(pressed&PSP_CTRL_UP)act=ActUp;
+            else if(pressed&PSP_CTRL_DOWN)act=ActDown;
+            else if(pressed&PSP_CTRL_LEFT)act=ActLeft;
+            else if(pressed&PSP_CTRL_RIGHT)act=ActRight;
+            else if(pressed&PSP_CTRL_CROSS)act=ActConfirm;
+            else if(pressed&PSP_CTRL_CIRCLE)act=ActBack;
+            else if(pressed&PSP_CTRL_SQUARE)act=ActReset;
+            else have=false;
+            if(have){
+                charGenAdvance(cgFlow,act,classes,cgBiog,names,cgRng);
+                if(cgFlow.step==StepBiography&&cgBiogClass!=cgFlow.doc.classIndex){
+                    cgBiogClass=cgFlow.doc.classIndex;
+                    cgBiog.load(vfs,cgBiogClass<0?0:cgBiogClass);
+                }
+                if(cgFlow.step==StepDone){chargen=false;applyCharacter();}
+            }
+            drawCharGenScreen(uiFb,cgFlow,classes,cgBiog,textRsc,vfs,pal,fontSmall,font);
+            rr.queueText(4,258,"D-pad choose  X confirm  O back  Square reroll name",rgba(255,232,128),&fontSmall);
+            rr.presentScreen(uiFb);
+            rr.swap();
+            continue;
+        }
         bool world=win==0;
+        if(win==6){
+            std::vector<int> ids=inventoryCategoryItems(inv,invCat);
+            if(pressed&PSP_CTRL_LEFT)invCat=(invCat+3)%4;
+            if(pressed&PSP_CTRL_RIGHT)invCat=(invCat+1)%4;
+            if(pressed&PSP_CTRL_UP&&invCur>0)invCur--;
+            if(pressed&PSP_CTRL_DOWN&&invCur+1<(int)ids.size())invCur++;
+            if((pressed&PSP_CTRL_CROSS)&&!ids.empty()){
+                int idx=ids[(size_t)invCur];
+                if(inv.items[(size_t)idx].slot!=SlotNone)inv.unequip(idx);
+                else inv.equip(idx);
+            }
+        }
         if(win==4){
             if(pressed&PSP_CTRL_UP&&travelCur>0)travelCur--;
             if(pressed&PSP_CTRL_DOWN&&travelCur+1<(int)travel.size())travelCur++;
@@ -179,12 +251,14 @@ int main(int argc,char**argv){
             }
         }
         if(pressed&PSP_CTRL_TRIANGLE)noclip=!noclip;
-        if(pressed&PSP_CTRL_SELECT)win=(win+1)%6;
+        if(pressed&PSP_CTRL_SELECT)win=(win+1)%7;
         if(pressed&PSP_CTRL_START){
             SaveData out;out.player=player;out.player.pos=feet;out.player.yaw=yaw;out.player.pitch=pitch;
             out.region=layout.region;out.exteriorId=layout.exteriorId;out.dungeonName=layout.name;
             for(auto& e:dungeon.enemies())out.enemies.push_back(fromEnemy(e));
             out.deadKeys=dungeon.deadKeys();out.spawnedKeys=dungeon.spawnedKeys();
+            out.character=charSaved;
+            for(auto& it:inv.items)out.items.push_back(fromItem(it));
             snprintf(status,sizeof(status),writeSave(savePath,out)?"SAVED":"SAVE FAILED");
         }
         float lx=world?(pad.Lx-128)/128.f:0.f,ly=world?(pad.Ly-128.f)/128.f:0.f;if(std::fabs(lx)<0.15f)lx=0;if(std::fabs(ly)<0.15f)ly=0;
@@ -264,6 +338,13 @@ int main(int argc,char**argv){
             if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");
             else{snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");smallHint=true;}
         }else{snprintf(hint,sizeof(hint),"Select: close window");smallHint=true;}
+        if(win==6&&dollReady){
+            drawInventoryScreen(uiFb,inv,doll,charSaved.faceIndex,invCat,invCur,vfs,pal,fontSmall,player.gold);
+            rr.queueText(4,258,"D-pad list/category  X equip or remove  Select close",rgba(255,232,128),&fontSmall);
+            rr.presentScreen(uiFb);
+            rr.swap();
+            continue;
+        }
         if(haveFont){
             rr.queueText(4,2,hud,hurtFlash>0.f?rgba(255,80,80):rgba(255,255,255));
             if(hint[0])rr.queueText(4,smallHint?259:256,hint,rgba(255,232,128),smallHint?&fontSmall:nullptr);

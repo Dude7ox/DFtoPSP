@@ -8,6 +8,7 @@
 #include "../src/core/Dungeon.h"
 #include "../src/core/Enemy.h"
 #include "../src/core/SaveGame.h"
+#include "../src/core/ItemDefs.h"
 #include "../src/core/Font.h"
 #include "../src/core/Ui.h"
 #include "../src/core/Automap.h"
@@ -275,8 +276,20 @@ int main(int argc,char**argv){
         CHECK(back.dungeonName==l.name);
         CHECK(back.spawnedKeys.size()==sd.spawnedKeys.size());
         CHECK(back.player.lockpick==31);CHECK(back.player.xp==42);CHECK(back.player.gold==43);CHECK(back.player.kills==9);
-        CHECK(back.version==3);
+        CHECK(back.version==4);
         CHECK(back.region==sd.region);CHECK(back.exteriorId==sd.exteriorId);
+        // Older saves (v1-v3 layout: no character/item tail) must still load.
+        {
+            FILE* f=fopen("test_core_save.dfs","rb");
+            fseek(f,0,SEEK_END);long n=ftell(f);fseek(f,0,SEEK_SET);
+            std::vector<u8> b((size_t)n);fread(b.data(),1,b.size(),f);fclose(f);
+            b.resize(b.size()-5);                 // drop v4 character flag + item count
+            b[4]=3;b[5]=b[6]=b[7]=0;              // claim version 3
+            f=fopen("test_core_save.dfs","wb");fwrite(b.data(),1,b.size(),f);fclose(f);
+            SaveData old;CHECK(readSave("test_core_save.dfs",old));
+            CHECK(old.version==3&&!old.character.valid&&old.items.empty());
+            CHECK(old.enemies.size()==sd.enemies.size());
+        }
         remove("test_core_save.dfs");
     }
     // --- Audio: HMI music from MIDI.BSA, samples from DAGGER.SND, synth ---
@@ -477,6 +490,120 @@ int main(int argc,char**argv){
         cues.ids.clear();
         d3.playerAttack(p,fwd);
         CHECK(cues.ids.empty());
+    }
+    // --- character creation, items, paper doll and save v4 ---
+    {
+        std::vector<Career> classes;CHECK(loadClasses(vfs,classes));
+        CHECK(classes.size()==18);
+        CHECK(classes[0].name=="Mage");
+        CHECK(classes[0].hpPerLevel==6);
+        CHECK(std::fabs(classes[0].advancement-1.04f)<0.01f);
+        CHECK(classes[0].attributes[0]==42&&classes[0].attributes[1]==60);
+        CHECK(classes[0].primary[0]==27&&classes[0].major[0]==24);
+        CHECK(classes[17].name=="Knight");
+        NameGen names;CHECK(names.open(vfs));
+        DfRandom nr(99);
+        std::string bn=names.fullName(RaceBreton,0,nr);
+        CHECK(!bn.empty()&&bn.find(' ')!=std::string::npos);
+        std::string rg=names.fullName(RaceRedguard,1,nr);
+        CHECK(!rg.empty()&&rg.find(' ')==std::string::npos);   // Redguards carry one name
+        TextRsc text;CHECK(text.open(vfs));
+        CHECK(text.has(2003)&&text.has(2100)&&text.has(4116));
+        for(int ci=0;ci<18;ci++){
+            BiogFile b;CHECK(b.load(vfs,ci));
+            CHECK(b.questions.size()==12);
+            for(size_t q=0;q<b.questions.size();q++)CHECK(!b.questions[q].answers.empty());
+        }
+        BiogEffects be;
+        CHECK(parseBiogEffect("22 +6",be)&&be.skillMod[22]==6);
+        CHECK(parseBiogEffect("GP +10",be)&&be.goldMod==10);
+        CHECK(parseBiogEffect("IT 3 3 0",be)&&be.items.size()==1&&be.items[0].group==3);
+        CHECK(!parseBiogEffect("#4150",be));
+        Font body;body.load(vfs,"FONT0003.FNT");
+        for(int ci=0;ci<19;ci++){                              // 18 classes + custom
+            bool custom=ci==18;
+            BiogFile biog;CHECK(biog.load(vfs,custom?0:ci));
+            DfRandom rng(1000+ci);
+            CharGenFlow f;
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            if(!custom){
+                for(int k=0;k<ci;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            }else{
+                for(int k=0;k<18;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                charGenAdvance(f,ActRight,classes,biog,names,rng);      // hp/level 9
+                for(int k=0;k<12;k++){charGenAdvance(f,ActDown,classes,biog,names,rng);
+                    charGenAdvance(f,ActRight,classes,biog,names,rng);} // skill slots
+                charGenAdvance(f,ActDown,classes,biog,names,rng);       // onto Done
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            }
+            int guard=0;
+            while(f.step!=StepDone&&guard++<600){
+                if(f.step==StepBiography)charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                else if(f.step==StepBonusStats){
+                    for(int k=0;k<14&&f.doc.bonusPool>0;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                }else if(f.step==StepBonusSkills){
+                    for(int k=0;k<80&&(f.doc.skillPool[0]+f.doc.skillPool[1]+f.doc.skillPool[2])>0;k++){
+                        charGenAdvance(f,ActRight,classes,biog,names,rng);
+                        charGenAdvance(f,ActDown,classes,biog,names,rng);
+                    }
+                    charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+                }else charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+            }
+            CHECK(f.step==StepDone);
+            CharacterDoc& d=f.doc;
+            CHECK(d.bonusPool==0);
+            CHECK(d.skillPool[0]==0&&d.skillPool[1]==0&&d.skillPool[2]==0);
+            CHECK(d.maxHp==25+d.career.hpPerLevel);
+            CHECK(d.hp==d.maxHp);
+            CHECK(d.gold>=0);
+            CHECK(!d.name.empty());
+            CHECK(d.faceIndex>=0&&d.faceIndex<10);
+            if(custom)CHECK(d.career.custom&&d.career.hpPerLevel==9);
+            Inventory inv;inv.gold=d.gold;
+            grantBiogItems(inv,d.biog,d.gender,d.race,rng);
+            assignStartingGear(inv,d.classIndex,d.classIndex<0,d.gender,d.race,rng);
+            CHECK(inv.atSlot(SlotChestClothes)!=0);
+            CHECK(inv.atSlot(SlotLegsClothes)!=0);
+            CHECK(inv.isUpperClothed()&&inv.isLowerClothed());
+            SaveData sd;sd.character=fromCharacter(d);
+            for(size_t i=0;i<inv.items.size();i++)sd.items.push_back(fromItem(inv.items[i]));
+            CHECK(writeSave("/tmp/dfpsp_test_save.bin",sd));
+            SaveData rd;CHECK(readSave("/tmp/dfpsp_test_save.bin",rd));
+            CHECK(rd.version==4&&rd.character.valid);
+            CHECK(rd.character.name==d.name);
+            CHECK(rd.character.career.hpPerLevel==d.career.hpPerLevel);
+            CHECK(rd.items.size()==inv.items.size());
+            if(ci==0){
+                CHECK(inv.items.size()>=4);
+                Item w=makeWeapon(ItemDef::Weapons_Shortsword,WMatSteel,false);
+                const ItemTemplate& t=itemTemplate(ItemDef::Weapons_Shortsword);
+                CHECK(w.value==t.basePrice*3*2);
+                CHECK(w.maxCondition==t.hitPoints*6/4);
+                CHECK(itemGroupOf(ItemDef::Weapons_Shortsword)==3);
+                CHECK(itemTemplateOfOrdinal(3,itemOrdinalInGroup(ItemDef::Weapons_Shortsword))==ItemDef::Weapons_Shortsword);
+                Item mi=makeWeapon(ItemDef::Weapons_Shortsword,WMatIron,false);
+                Item fw=makeWeapon(ItemDef::Weapons_Shortsword,WMatIron,true);
+                CHECK(fw.playerArchive==mi.playerArchive-1);
+                Inventory tw;
+                tw.add(makeItem(ItemDef::Jewellery_Ring));tw.add(makeItem(ItemDef::Jewellery_Ring));
+                CHECK(tw.equip(0)&&tw.equip(1));
+                CHECK(tw.atSlot(SlotRing0)&&tw.atSlot(SlotRing1));
+                PaperDoll doll;CHECK(doll.load(vfs,d.race,d.gender));
+                CHECK(doll.equipIndexAt(0,0)==SlotNone);
+                Framebuffer fb;fb.resize(320,200);
+                doll.draw(fb,200,8,inv,d.faceIndex,pal);
+                size_t drawn=0;
+                for(int y=8;y<192;y+=7)for(int x=200;x<310;x+=7)
+                    if(fb.color[(size_t)y*320+x]!=0xff000000)drawn++;
+                CHECK(drawn>50);
+                drawInventoryScreen(fb,inv,doll,d.faceIndex,0,0,vfs,pal,body,inv.gold);
+                drawCharGenScreen(fb,f,classes,biog,text,vfs,pal,body,body);
+            }
+        }
     }
     printf("core tests passed\n");return 0;
 }

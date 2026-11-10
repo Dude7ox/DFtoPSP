@@ -23,9 +23,17 @@ Implemented:
 - Original `FONT000?.FNT` bitmap faces (DFU-compatible reader): HUD and screenshots
   render in the classic FONT0001 gothic face on host and PSP.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
+- Character creation on a fresh boot (no save): race, gender, the 18 classic
+  careers plus a custom class screen, twelve biography questions, bonus attribute
+  and skill rolls, face and NAMEGEN name - all over the original CHGN/CUST/CHAR
+  art with TEXT.RSC descriptions; the finished character, kit and gold carry into
+  the game and the save (format v4, older saves still load). See `docs/CHARACTER.md`.
 - UI windows in the original faces (Select cycles): HELP, CHARACTER sheet, MESSAGE LOG
-  (hits, kills, level-ups, lockpicks), TRAVEL and a dungeon automap (walls, doors,
-  player arrow) built from the streamed block geometry.
+  (hits, kills, level-ups, lockpicks), TRAVEL, a dungeon automap (walls, doors,
+  player arrow) built from the streamed block geometry, and INVENTORY: the classic
+  window with original item icons from the TEXTURE archives, equip/remove and the
+  race paper doll with worn clothing, armour and weapons.
+
 - Audio straight from the original files: HMI music from `MIDI.BSA` (131 songs parsed
   and rendered by a 28-voice software synthesizer at 22050 Hz stereo) and effects from
   `DAGGER.SND` (459 records), spatialised per monster and streamed on the PSP by a
@@ -33,7 +41,7 @@ Implemented:
   (`docs/AUDIO.md`, `docs/audio.wav`).
 - Travel: the classic dungeon list of the current region from MAPS.BSA; travel to any
   entry with the cursor + X; the saved location is restored on boot.
-- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit.
+- PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit. In character creation: D-pad choose, X confirm, O back, Square reroll names; inventory window: D-pad list/category, X equip/remove.
 - Gravity, floor snapping, radius/height collision, fall recovery.
 - Host software renderer + CLI for validation and screenshots (`--stats` reports
   frustum-culled triangle counts).

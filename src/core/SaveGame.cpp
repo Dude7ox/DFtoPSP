@@ -71,6 +71,34 @@ bool writeSave(const std::string& path,const SaveData& d){
     for(auto& s:d.deadKeys)w.pstr(s);
     w.pu32((u32)d.doors.size());
     for(auto& dr:d.doors){w.pstr(dr.key);w.pf32(dr.amount);w.pf32(dr.target);}
+    w.pu8((u8)(d.character.valid?1:0));
+    if(d.character.valid){
+        const SavedCharacter& ch=d.character;
+        w.pi32(ch.race);w.pi32(ch.gender);w.pi32(ch.classIndex);w.pi32(ch.biographyIndex);w.pi32(ch.faceIndex);
+        w.pstr(ch.name);
+        for(int i=0;i<8;i++)w.pi32(ch.attributes[i]);
+        for(int i=0;i<8;i++)w.pi32(ch.rolledAttributes[i]);
+        w.pi32(ch.bonusPool);
+        for(int i=0;i<35;i++)w.pi32(ch.skillValues[i]);
+        for(int i=0;i<3;i++)w.pi32(ch.skillPool[i]);
+        for(int i=0;i<12;i++)w.pi32(ch.answers[i]);
+        w.pstr(ch.career.name);w.pi32(ch.career.hpPerLevel);w.pf32(ch.career.advancement);
+        for(int i=0;i<8;i++)w.pi32(ch.career.attributes[i]);
+        for(int i=0;i<3;i++)w.pi32(ch.career.primary[i]);
+        for(int i=0;i<3;i++)w.pi32(ch.career.major[i]);
+        for(int i=0;i<6;i++)w.pi32(ch.career.minor[i]);
+        w.pu32(ch.career.resistance);w.pu32(ch.career.immunity);w.pu32(ch.career.lowTolerance);w.pu32(ch.career.criticalWeakness);
+        w.pu32(ch.career.specialAbilities);
+        w.pi32(ch.career.rapidHealing);w.pi32(ch.career.regeneration);w.pi32(ch.career.spellAbsorption);w.pi32(ch.career.attackModifier);
+        w.pu32(ch.career.forbiddenMaterials);w.pu32(ch.career.weaponArmorShields);
+        w.pu8((u8)(ch.career.custom?1:0));
+    }
+    w.pu32((u32)d.items.size());
+    for(auto& it:d.items){
+        w.pi32(it.templateIndex);w.pi32(it.stack);w.pi32(it.value);w.pi32(it.weightQ);w.pi32(it.material);
+        w.pi32(it.maxCondition);w.pi32(it.condition);w.pi32(it.variant);w.pi32(it.dye);w.pi32(it.slot);
+        w.pi32(it.playerArchive);w.pi32(it.playerRecord);
+    }
     FILE* f=fopen(path.c_str(),"wb");
     if(!f)return false;
     size_t n=fwrite(w.b.data(),1,w.b.size(),f);
@@ -90,7 +118,7 @@ bool readSave(const std::string& path,SaveData& d){
     if(memcmp(magic,"DFPS",4)!=0)return false;
     d=SaveData{};
     d.version=r.u32v();
-    if(d.version<1||d.version>3)return false;
+    if(d.version<1||d.version>4)return false;
     d.player.level=r.i32v();d.player.hp=r.i32v();d.player.maxHp=r.i32v();
     d.player.weaponMin=r.i32v();d.player.weaponMax=r.i32v();d.player.skill=r.i32v();d.player.armor=r.i32v();
     if(d.version>=2){d.player.lockpick=r.i32v();d.player.xp=r.i32v();d.player.gold=r.i32v();}
@@ -120,6 +148,81 @@ bool readSave(const std::string& path,SaveData& d){
     for(u32 i=0;i<nd;i++)d.deadKeys.push_back(r.str());
     u32 ndo=r.u32v();if(!r.ok||ndo>100000)return false;
     for(u32 i=0;i<ndo;i++){SavedDoor dr;dr.key=r.str();dr.amount=r.f32v();dr.target=r.f32v();if(!r.ok)return false;d.doors.push_back(dr);}
+    if(d.version>=4){
+        SavedCharacter& ch=d.character;
+        ch.valid=r.u8v()!=0;
+        if(ch.valid){
+            ch.race=r.i32v();ch.gender=r.i32v();ch.classIndex=r.i32v();ch.biographyIndex=r.i32v();ch.faceIndex=r.i32v();
+            ch.name=r.str();
+            for(int i=0;i<8;i++)ch.attributes[i]=r.i32v();
+            for(int i=0;i<8;i++)ch.rolledAttributes[i]=r.i32v();
+            ch.bonusPool=r.i32v();
+            for(int i=0;i<35;i++)ch.skillValues[i]=r.i32v();
+            for(int i=0;i<3;i++)ch.skillPool[i]=r.i32v();
+            for(int i=0;i<12;i++)ch.answers[i]=r.i32v();
+            ch.career.name=r.str();ch.career.hpPerLevel=r.i32v();ch.career.advancement=r.f32v();
+            for(int i=0;i<8;i++)ch.career.attributes[i]=r.i32v();
+            for(int i=0;i<3;i++)ch.career.primary[i]=r.i32v();
+            for(int i=0;i<3;i++)ch.career.major[i]=r.i32v();
+            for(int i=0;i<6;i++)ch.career.minor[i]=r.i32v();
+            ch.career.resistance=r.u32v();ch.career.immunity=r.u32v();ch.career.lowTolerance=r.u32v();ch.career.criticalWeakness=r.u32v();
+            ch.career.specialAbilities=r.u32v();
+            ch.career.rapidHealing=r.i32v();ch.career.regeneration=r.i32v();ch.career.spellAbsorption=r.i32v();ch.career.attackModifier=r.i32v();
+            ch.career.forbiddenMaterials=r.u32v();ch.career.weaponArmorShields=r.u32v();
+            ch.career.custom=r.u8v()!=0;
+        }
+        u32 ni=r.u32v();
+        if(!r.ok||ni>100000)return false;
+        for(u32 i=0;i<ni;i++){
+            SavedItem it;
+            it.templateIndex=r.i32v();it.stack=r.i32v();it.value=r.i32v();it.weightQ=r.i32v();it.material=r.i32v();
+            it.maxCondition=r.i32v();it.condition=r.i32v();it.variant=r.i32v();it.dye=r.i32v();it.slot=r.i32v();
+            it.playerArchive=r.i32v();it.playerRecord=r.i32v();
+            if(!r.ok)return false;
+            d.items.push_back(it);
+        }
+    }
     return r.ok;
+}
+SavedItem fromItem(const Item& it){
+    SavedItem s;
+    s.templateIndex=it.templateIndex;s.stack=it.stack;s.value=it.value;s.weightQ=it.weightQ;
+    s.material=it.material;s.maxCondition=it.maxCondition;s.condition=it.condition;
+    s.variant=it.variant;s.dye=it.dye;s.slot=it.slot;
+    s.playerArchive=it.playerArchive;s.playerRecord=it.playerRecord;
+    return s;
+}
+Item toItem(const SavedItem& s){
+    Item it;
+    it.templateIndex=s.templateIndex;it.stack=s.stack;it.value=s.value;it.weightQ=s.weightQ;
+    it.material=s.material;it.maxCondition=s.maxCondition;it.condition=s.condition;
+    it.variant=s.variant;it.dye=s.dye;it.slot=s.slot;
+    it.playerArchive=s.playerArchive;it.playerRecord=s.playerRecord;
+    return it;
+}
+SavedCharacter fromCharacter(const CharacterDoc& d){
+    SavedCharacter c;
+    c.valid=true;
+    c.race=d.race;c.gender=d.gender;c.classIndex=d.classIndex;c.biographyIndex=d.biographyIndex;
+    c.faceIndex=d.faceIndex;c.name=d.name;
+    for(int i=0;i<8;i++){c.attributes[i]=d.attributes[i];c.rolledAttributes[i]=d.rolledAttributes[i];}
+    c.bonusPool=d.bonusPool;
+    for(int i=0;i<35;i++)c.skillValues[i]=d.skillValues[i];
+    for(int i=0;i<3;i++)c.skillPool[i]=d.skillPool[i];
+    for(int i=0;i<12;i++)c.answers[i]=d.answers[i];
+    c.career=d.career;
+    return c;
+}
+void toCharacter(const SavedCharacter& s,CharacterDoc& d){
+    d.race=s.race;d.gender=s.gender;d.classIndex=s.classIndex;d.biographyIndex=s.biographyIndex;
+    d.faceIndex=s.faceIndex;d.name=s.name;
+    for(int i=0;i<8;i++){d.attributes[i]=s.attributes[i];d.rolledAttributes[i]=s.rolledAttributes[i];}
+    d.bonusPool=s.bonusPool;
+    for(int i=0;i<35;i++)d.skillValues[i]=s.skillValues[i];
+    for(int i=0;i<3;i++)d.skillPool[i]=s.skillPool[i];
+    for(int i=0;i<12;i++)d.answers[i]=s.answers[i];
+    d.career=s.career;
+    d.rolled=true;
+    finalizeCharacter(d);
 }
 } // namespace dfpsp

@@ -17,10 +17,34 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Single-block load: `B0000001.RDB` -> 1128 world triangles, 36 model instances,
   12 gameplay flats, 4 action doors.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
-- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 462 checked, 0 bad.
+- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 613 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 560,572 bytes (audio build, stripped)
-  - SHA-256: `621b6b7d7fa60155b031af9bcca3279b96d193745456080367862e5820a5c927`
+  - `EBOOT.PBP`: 687,340 bytes (character creation build, stripped)
+  - SHA-256: `198c732f26d968a8b127ed7e18b30c46cd0ef0be6f5ef3980943f1c8b780d626`
+
+## Character creation increment
+
+- `IMG/CIF/RCI` reader (headers, RLE-2, headerless size table, embedded and
+  per-file palettes) validated by decoding every chargen/paper-doll/inventory
+  background, all ten heads per race and the body records to BMP on host.
+- `TEXT.RSC` reader validated against race (2000-2007), class (2100+) and skill
+  (1360+) records; `CLASS??.CFG` careers match the classic values (Mage hp 6,
+  advancement 1.04, attributes 42/60/65/45/45/50/43/50).
+- `BIOG??T0.TXT`: 12 questions with answers and effect commands for all 18
+  careers; `NAMEGEN.DAT` banks compose race-correct names (Redguards a single
+  name, Nords no surname in the classic data).
+- Creation flow runs to completion for all 18 careers and the custom screen in
+  the sanitizer test suite; bonus pools always end fully spent.
+- Item templates (288) generated from the original table; material multipliers,
+  equip slots, twin slots, icon and paper-doll art resolution follow the classic
+  rules; inventory window renders icons from the TEXTURE archives and the doll
+  shows worn clothing/armour/weapons (`docs/inventory.png`, `docs/chargen.png`).
+- Save format v4 stores the character document and the whole kit; v1-v3 loads
+  remain supported (tested by rewriting a v4 file back to v3 layout).
+- New data files (151) fetched from the freeware mirror and recorded in
+  `data/MANIFEST.json` with mirror blob-SHA provenance: class configs,
+  biographies, NAMEGEN.DAT, faces/bodies/backgrounds, chargen screens,
+  inventory art and TEXTURE.233-252 icon/paper-doll archives.
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables

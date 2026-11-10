@@ -239,6 +239,35 @@ void PspRenderer::render(const Dungeon& d,const Camera& cam,const char* status,f
     overlay(status,fps);
     sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
 }
+void PspRenderer::presentScreen(const Framebuffer& fb){
+    if(scr_.size()!=512*256)scr_.assign(512*256,0xff000000);
+    for(int y=0;y<256;y++){
+        u32* dst=&scr_[(size_t)y*512];
+        if(y<fb.h){
+            for(int x=0;x<512;x++)dst[x]=(x<fb.w)?fb.color[(size_t)y*fb.w+x]:0xff000000;
+        }else for(int x=0;x<512;x++)dst[x]=0xff000000;
+    }
+    sceKernelDcacheWritebackInvalidateRange(scr_.data(),512*256*4);
+    sceGuStart(GU_DIRECT,list);
+    sceGuClearColor(0xff000000);sceGuClearDepth(0);sceGuClear(GU_COLOR_BUFFER_BIT|GU_DEPTH_BUFFER_BIT);
+    sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();sceGumOrtho(0,480,272,0,-1,1);
+    sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();
+    sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
+    sceGuDisable(GU_DEPTH_TEST);sceGuDisable(GU_BLEND);
+    sceGuEnable(GU_TEXTURE_2D);
+    sceGuTexMode(GU_PSM_8888,0,0,0);sceGuTexFunc(GU_TFX_REPLACE,GU_TCC_RGBA);
+    sceGuTexFilter(GU_NEAREST,GU_NEAREST);sceGuTexWrap(GU_CLAMP,GU_CLAMP);
+    sceGuTexImage(0,512,256,512,scr_.data());
+    sceGuTexScale(1.f,1.f);sceGuTexOffset(0,0);
+    GuVertex* v=(GuVertex*)sceGuGetMemory(2*sizeof(GuVertex));
+    v[0].u=0;v[0].v=0;v[0].color=0xffffffff;v[0].x=0;v[0].y=0;v[0].z=0;
+    v[1].u=fb.w/512.f;v[1].v=fb.h/256.f;v[1].color=0xffffffff;v[1].x=480;v[1].y=272;v[1].z=0;
+    sceGumDrawArray(GU_SPRITES,GU_TEXTURE_32BITF|GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,2,0,v);
+    sceGuDisable(GU_TEXTURE_2D);
+    drawQueuedText();nLines_=0;
+    sceGuEnable(GU_DEPTH_TEST);
+    sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
+}
 void PspRenderer::swap(){sceDisplayWaitVblankStart();sceGuSwapBuffers();swaps_++;}
 void PspRenderer::term(){sceGuTerm();}
 } // namespace

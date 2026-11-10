@@ -33,7 +33,7 @@ private:
     struct UiRect { int x=0,y=0,w=0,h=0; u32 c=0; };
     UiRect rects_[8]; int nRects_=0;
     struct UiLine { short x0,y0,x1,y1; u32 c; };
-    std::vector<UiLine> lines_;
+    std::vector<UiLine> mapLines_;
     TexSlot& getTex(int a,int r,int frame=0);
     void drawScene(const Scene& s,const Camera& cam);
     void drawEnemies(const Dungeon& d,const Camera& cam);

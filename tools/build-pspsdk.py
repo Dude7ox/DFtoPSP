@@ -20,6 +20,10 @@ BIN = PSPDEV / "bin"
 for d in (SDKLIB, SDKINC, INC, BIN):
     d.mkdir(parents=True, exist_ok=True)
 
+if not (SDK / "src" / "Makefile.am").exists():
+    SDK.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "clone", "--depth", "1", "https://github.com/pspdev/pspsdk", str(SDK)], check=True)
+
 CC = "psp-gcc"
 CFLAGS = ["-O2", "-mno-gpopt", "-Wall", "-D_PSP_FW_VERSION=600", "-g0"]
 JOBS = "-j2"

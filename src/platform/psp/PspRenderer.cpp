@@ -184,7 +184,7 @@ void PspRenderer::drawEnemies(const Dungeon& d,const Camera& cam){
     sceGuDisable(GU_BLEND);
 }
 void PspRenderer::queueMap(const AutomapData& m,int px,int py,int pw,int ph){
-    lines_.clear();
+    mapLines_.clear();
     float cxw=(m.minx+m.maxx)*0.5f,czw=(m.minz+m.maxz)*0.5f;
     float s=pw/(m.maxx-m.minx);float s2=ph/(m.maxz-m.minz);if(s2<s)s=s2;
     float cx=px+pw*0.5f,cy=py+ph*0.5f;
@@ -193,7 +193,7 @@ void PspRenderer::queueMap(const AutomapData& m,int px,int py,int pw,int ph){
             UiLine l;
             l.x0=(short)(cx+(g.x0-cxw)*s);l.y0=(short)(cy-(g.z0-czw)*s);
             l.x1=(short)(cx+(g.x1-cxw)*s);l.y1=(short)(cy-(g.z1-czw)*s);
-            l.c=c;lines_.push_back(l);
+            l.c=c;mapLines_.push_back(l);
         }
     };
     put(m.walls,0xffc8b478);put(m.doors,0xff78c878);put(m.marker,0xffffffff);
@@ -208,10 +208,10 @@ void PspRenderer::overlay(const char* status,float fps){
     for(int i=0;i<nRects_;i++)rect(rects_[i].x,rects_[i].y,rects_[i].w,rects_[i].h,rects_[i].c);
     nRects_=0;
     flush();
-    if(!lines_.empty()){
+    if(!mapLines_.empty()){
         for(u32 group=0;group<3;group++){
             u32 want=group==0?0xffc8b478:(group==1?0xff78c878:0xffffffff);
-            for(auto& l:lines_){
+            for(auto& l:mapLines_){
                 if(l.c!=want)continue;
                 if(n+2>4096)flush();
                 verts[n++]={0,0,l.c,(float)l.x0,(float)l.y0,0};
@@ -219,7 +219,7 @@ void PspRenderer::overlay(const char* status,float fps){
             }
             if(n){sceGumDrawArray(GU_LINES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n,0,verts);n=0;}
         }
-        lines_.clear();
+        mapLines_.clear();
     }
     drawQueuedText();nLines_=0;
     sceGuEnable(GU_DEPTH_TEST);

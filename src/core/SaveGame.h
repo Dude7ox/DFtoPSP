@@ -16,7 +16,7 @@ struct SavedEnemy {
 };
 struct SavedDoor { std::string key; float amount=0, target=0; };
 struct SaveData {
-    u32 version=2;
+    u32 version=3;
     PlayerState player;
     int region=0, exteriorId=0;
     std::string dungeonName;

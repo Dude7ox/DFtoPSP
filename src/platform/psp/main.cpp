@@ -11,6 +11,7 @@
 #include <cmath>
 #include "../../core/Dungeon.h"
 #include "../../core/SaveGame.h"
+#include "../../core/Ui.h"
 #include "PspRenderer.h"
 PSP_MODULE_INFO("DFtoPSP",0,0,3);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER|THREAD_ATTR_VFPU);
@@ -30,6 +31,22 @@ static void fatalDiag(const char* msg,const std::string& diag){
     pspDebugScreenPrintf("DFtoPSP\n\n%s\n\n%s\nPress HOME to exit.\n",msg,diag.c_str());
     while(!exitRequested)sceDisplayWaitVblankStart();
     sceKernelExitGame();
+}
+// Classic-style window panel: dark plate, thin border, FONT0001 title and
+// FONT0003 body lines. `tail` shows the newest lines (message log).
+static void queueWindow(PspRenderer& rr,const Font& f1,const Font& f3,const char* title,
+                        const std::vector<std::string>& body,bool tail,int maxLines){
+    int total=(int)body.size();int lines=total>maxLines?maxLines:total;
+    if(lines<=0)return;
+    int w=360,h=4+16+lines*10+6,x=(480-w)/2,y=(272-h)/2;
+    rr.queueRect(x,y,w,h,rgba(24,18,12,224));
+    rr.queueRect(x,y,w,1,rgba(150,120,70,255));
+    rr.queueRect(x,y+h-1,w,1,rgba(150,120,70,255));
+    rr.queueRect(x,y,1,h,rgba(150,120,70,255));
+    rr.queueRect(x+w-1,y,1,h,rgba(150,120,70,255));
+    rr.queueText((480-f1.textWidth(title))/2,y+4,title,rgba(255,232,128));
+    int ly=y+20,start=tail?total-lines:0;
+    for(int i=0;i<lines;i++){rr.queueText(x+12,ly,body[(size_t)(start+i)].c_str(),rgba(255,255,255),&f3);ly+=10;}
 }
 int main(int argc,char**argv){
     (void)argc;(void)argv;setupExit();
@@ -94,9 +111,10 @@ int main(int argc,char**argv){
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
-    bool noclip=false,help=true;
+    bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log
     SceCtrlData pad{},old{};u64 last=sceKernelGetSystemTimeWide();float fps=60.f;u32 frames=0;float fpsTimer=0.f;
     char status[160];status[0]=0;
+    MsgLog log;dungeon.setLog(&log);log.push("You enter "+layout.name+".");
     float hurtFlash=0.f;
     while(!exitRequested){
         sceCtrlReadBufferPositive(&pad,1);u32 pressed=pad.Buttons&~old.Buttons;old=pad;
@@ -104,7 +122,7 @@ int main(int argc,char**argv){
         u64 now=sceKernelGetSystemTimeWide();float dt=(float)(now-last)/1000000.f;last=now;if(dt>0.1f)dt=0.1f;if(dt<=0)dt=1.f/60.f;
         fpsTimer+=dt;frames++;if(fpsTimer>=0.5f){fps=frames/fpsTimer;frames=0;fpsTimer=0;}
         if(pressed&PSP_CTRL_TRIANGLE)noclip=!noclip;
-        if(pressed&PSP_CTRL_SELECT)help=!help;
+        if(pressed&PSP_CTRL_SELECT)win=(win+1)%4;
         if(pressed&PSP_CTRL_START){
             SaveData out;out.player=player;out.player.pos=feet;out.player.yaw=yaw;out.player.pitch=pitch;
             out.region=layout.region;out.exteriorId=layout.exteriorId;out.dungeonName=layout.name;
@@ -159,11 +177,16 @@ int main(int argc,char**argv){
         char hud[96];
         snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu%s%s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status[0]?"  ":"",status);
         char hint[96];hint[0]=0;bool smallHint=false;
-        if(help){snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");smallHint=true;}
-        else if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");
+        if(win==0){
+            if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");
+            else{snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");smallHint=true;}
+        }else{snprintf(hint,sizeof(hint),"Select: close window");smallHint=true;}
         if(haveFont){
             rr.queueText(4,2,hud,hurtFlash>0.f?rgba(255,80,80):rgba(255,255,255));
             if(hint[0])rr.queueText(4,smallHint?259:256,hint,rgba(255,232,128),smallHint?&fontSmall:nullptr);
+            if(win==1)queueWindow(rr,font,fontSmall,"HELP",helpLines(),false,8);
+            else if(win==2)queueWindow(rr,font,fontSmall,"CHARACTER",charSheetLines(player,layout.name),false,10);
+            else if(win==3)queueWindow(rr,font,fontSmall,"MESSAGE LOG",log.lines(),true,14);
         }
         rr.render(dungeon,cam,status,fps);
         if(!haveFont){

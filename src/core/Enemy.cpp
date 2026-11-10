@@ -104,7 +104,7 @@ float enemyEyeHeight(const Enemy& e){return e.bodyH*0.75f;}
 bool enemySwingHits(int enemyLevel,int playerArmor,DfRandom& rng){
     float chance=0.45f+enemyLevel*0.02f-playerArmor*0.003f;
     if(chance<0.15f)chance=0.15f;if(chance>0.9f)chance=0.9f;
-    return rng.percent()<chance;
+    return rng.percent()<=(int)(chance*100.f);
 }
 static bool seqValid(const signed char* seq){return seq&&seq[0]>=-1;}
 int enemySwingDamage(const EnemyStatic& st,DfRandom& rng){
@@ -122,7 +122,7 @@ int enemySwingDamage(const EnemyStatic& st,DfRandom& rng){
 bool playerSwingHits(int skill,int enemyLevel,DfRandom& rng){
     float chance=0.30f+(skill-enemyLevel*3)/200.f+0.25f;
     if(chance<0.15f)chance=0.15f;if(chance>0.95f)chance=0.95f;
-    return rng.percent()<chance;
+    return rng.percent()<=(int)(chance*100.f);
 }
 int playerSwingDamage(int minDamage,int maxDamage,int enemyArmor,DfRandom& rng){
     int lo=minDamage,hi=maxDamage;

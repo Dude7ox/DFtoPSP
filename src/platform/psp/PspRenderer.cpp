@@ -63,10 +63,15 @@ bool PspRenderer::initFont(const Font& main,const Font& small){
     fontReady_=true;return true;
 }
 void PspRenderer::queueText(int x,int y,const char* s,u32 argb,const Font* f){
-    if(nLines_>=4)return;
+    if(nLines_>=20)return;
     TextLine& l=lines_[nLines_++];
     l.x=x;l.y=y;l.c=argb;l.f=f;
     std::strncpy(l.s,s,sizeof(l.s)-1);l.s[sizeof(l.s)-1]=0;
+}
+void PspRenderer::queueRect(int x,int y,int w,int h,u32 argb){
+    if(nRects_>=8)return;
+    UiRect& r=rects_[nRects_++];
+    r.x=x;r.y=y;r.w=w;r.h=h;r.c=argb;
 }
 void PspRenderer::drawQueuedText(){
     if(!fontReady_||nLines_==0)return;
@@ -184,6 +189,8 @@ void PspRenderer::overlay(const char* status,float fps){
     auto rect=[&](float x,float y,float w,float h,u32 c){if(n+2>4096)flush();verts[n++]={0,0,c,x,y,0};verts[n++]={0,0,c,x+w,y+h,0};};
     rect(238,134,5,1,0xc0ffffff);rect(240,132,1,5,0xc0ffffff);
     rect(0,0,480,18,0xa0000000);rect(0,254,480,18,0xa0000000);
+    for(int i=0;i<nRects_;i++)rect(rects_[i].x,rects_[i].y,rects_[i].w,rects_[i].h,rects_[i].c);
+    nRects_=0;
     flush();
     drawQueuedText();nLines_=0;
     sceGuEnable(GU_DEPTH_TEST);

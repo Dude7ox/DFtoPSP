@@ -12,6 +12,8 @@ public:
     // Screen-space text queued before render(); drawn with the font atlas
     // on top of the HUD bars (1px black drop shadow, original faces).
     void queueText(int x,int y,const char* s,u32 argb,const Font* f=nullptr);
+    // Translucent panel rectangle queued with the text (window backgrounds).
+    void queueRect(int x,int y,int w,int h,u32 argb);
     void render(const Dungeon& dungeon,const Camera& cam,const char* status,float fps);
     void swap();
     void term();
@@ -24,7 +26,9 @@ private:
     TexSlot slots_[SLOTS]; u32 tick_=0; u32 swaps_=0;
     u32 texBase_=0, fontBase_=0; const Font* font_=nullptr; const Font* fontSmall_=nullptr; bool fontReady_=false;
     struct TextLine { int x=0,y=0; u32 c=0xffffffff; const Font* f=nullptr; char s[80]; };
-    TextLine lines_[4]; int nLines_=0;
+    TextLine lines_[20]; int nLines_=0;
+    struct UiRect { int x=0,y=0,w=0,h=0; u32 c=0; };
+    UiRect rects_[8]; int nRects_=0;
     TexSlot& getTex(int a,int r,int frame=0);
     void drawScene(const Scene& s,const Camera& cam);
     void drawEnemies(const Dungeon& d,const Camera& cam);

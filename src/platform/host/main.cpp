@@ -4,6 +4,7 @@
 #include "../../core/Dungeon.h"
 #include "../../core/SoftwareRenderer.h"
 #include "../../core/Font.h"
+#include "../../core/Ui.h"
 #include "../../core/SaveGame.h"
 #include <cstdio>
 #include <cstring>
@@ -11,7 +12,7 @@
 using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
-    float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
+    std::string uiMode;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
         else if(!strcmp(argv[i],"--block")&&i+1<argc)block=argv[++i];
@@ -30,6 +31,7 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--place")&&i+1<argc)place=(float)atof(argv[++i]);
         else if(!strcmp(argv[i],"--hurt"))hurt=true;
         else if(!strcmp(argv[i],"--kill"))kill=true;
+        else if(!strcmp(argv[i],"--ui")&&i+1<argc)uiMode=argv[++i];
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
     }
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");vfs.loadModList(root);vfs.loadModList(".");
@@ -43,6 +45,7 @@ int main(int argc,char**argv){
         if(layout){printf("%s region=%d ext=%d int=%d type=%d blocks=%zu\n",l.name.c_str(),l.region,l.exteriorId,l.interiorId,l.dungeonType,l.blocks.size());for(auto&b:l.blocks)printf("  %d %d %s%s\n",b.x,b.z,b.name.c_str(),b.start?" START":"");return 0;}
         Dungeon dungeon(vfs,arch3d,blocks,monsters);
         if(!dungeon.enter(l,playerLevel)){fprintf(stderr,"dungeon load failed\n");return 1;}
+        MsgLog log;dungeon.setLog(&log);log.push("You enter "+l.name+".");
         PlayerState player;player.level=playerLevel;
         Vec3 feet=dungeon.spawn();
         if(!loadPath.empty()){
@@ -97,12 +100,27 @@ int main(int argc,char**argv){
         if(withEnemies)rr.renderEnemies(dungeon.enemies(),cam,fb);
         // HUD text in the original FONT0001 face when the data provides it.
         Font font;font.load(vfs,"FONT0001.FNT");
+        Font fontSmall;fontSmall.load(vfs,"FONT0003.FNT");
         if(font.loaded()){
             size_t live=0;for(auto& e:dungeon.enemies())if(e.state!=EnemyDead)live++;
             char hud[96];
             snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg Aggro %zu",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,live);
             drawText(fb,font,4,3,hud,rgba(255,255,255));
             drawText(fb,font,4,h-16,l.name.c_str(),rgba(255,232,128));
+            std::vector<std::string> body;bool tail=false;const char* title="";
+            if(uiMode=="char"){title="CHARACTER";body=charSheetLines(player,l.name);}
+            else if(uiMode=="help"){title="HELP";body=helpLines();}
+            else if(uiMode=="log"){title="MESSAGE LOG";body=log.lines();tail=true;}
+            if(!body.empty()){
+                int total=(int)body.size();int lines=total>14?14:total;
+                int w=360,wh=4+16+lines*10+6,x=(480-w)/2,y=(272-wh)/2;
+                for(int Y=y;Y<y+wh;Y++)for(int X=x;X<x+w;X++)fb.color[Y*fb.w+X]=rgba(24,18,12);
+                for(int X=x;X<x+w;X++){fb.color[y*fb.w+X]=rgba(150,120,70);fb.color[(y+wh-1)*fb.w+X]=rgba(150,120,70);}
+                for(int Y=y;Y<y+wh;Y++){fb.color[Y*fb.w+x]=rgba(150,120,70);fb.color[Y*fb.w+x+w-1]=rgba(150,120,70);}
+                drawText(fb,font,(480-font.textWidth(title))/2,y+4,title,rgba(255,232,128));
+                int ly=y+20,start=tail?total-lines:0;
+                for(int i=0;i<lines;i++){drawText(fb,fontSmall,x+12,ly,body[(size_t)(start+i)],rgba(255,255,255));ly+=10;}
+            }
         }
         if(!writeBmp(out,fb))return 1;
         size_t alive=0,dead=0;for(auto& e:dungeon.enemies())(e.state==EnemyDead?dead:alive)++;

@@ -88,6 +88,10 @@ Screenshots from the host software renderer:
   previously used `B,N,W,M,S`; with the wrong order most dungeons decoded to
   non-existent blocks (and the test dungeon silently loaded substitute blocks).
   All sampled region-16 locations now enter, including cemeteries.
+- Automap window (Select cycle, sixth state): `buildAutomap()` projects the
+  horizontal edges of vertical wall triangles of every resident block plus the
+  door outlines and a player arrow into a north-up panel (core `Automap`,
+  host `--ui map`, PSP GE `GU_LINES` via `queueMap`), `docs/automap.png`.
 - Combat accuracy fix: `enemySwingHits`/`playerSwingHits` compared
   `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
   never land a blow; both now scale to percent and player swings roll to hit

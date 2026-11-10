@@ -24,7 +24,8 @@ Implemented:
   render in the classic FONT0001 gothic face on host and PSP.
 - PSP GU renderer: indexed textures, CLUT, triangle world, billboard flats, depth buffer, double-buffered HUD.
 - UI windows in the original faces (Select cycles): HELP, CHARACTER sheet, MESSAGE LOG
-  (hits, kills, level-ups, lockpicks) and TRAVEL.
+  (hits, kills, level-ups, lockpicks), TRAVEL and a dungeon automap (walls, doors,
+  player arrow) built from the streamed block geometry.
 - Travel: the classic dungeon list of the current region from MAPS.BSA; travel to any
   entry with the cursor + X; the saved location is restored on boot.
 - PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit.

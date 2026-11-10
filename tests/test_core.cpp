@@ -10,6 +10,7 @@
 #include "../src/core/SaveGame.h"
 #include "../src/core/Font.h"
 #include "../src/core/Ui.h"
+#include "../src/core/Automap.h"
 #include "../src/core/SoftwareRenderer.h"
 #include "../src/core/Random.h"
 #include <cassert>
@@ -201,6 +202,18 @@ int main(int argc,char**argv){
         Vec3 s2=d2.spawn();CHECK(std::isfinite(s2.x)&&std::isfinite(s2.z));
         CHECK(d2.resident().size()>=1);
         CHECK(dungeon.enter(l,3));   // back home for the save test
+    }
+    // Automap: wall outline, door outlines and the player arrow.
+    {
+        AutomapData am;buildAutomap(dungeon,sp,0.f,1500.f,am);
+        CHECK(am.walls.size()>100);
+        CHECK(!am.doors.empty());
+        CHECK(am.marker.size()==3);
+        CHECK(am.minx==sp.x-1500.f&&am.maxx==sp.x+1500.f);
+        CHECK(am.minz==sp.z-1500.f&&am.maxz==sp.z+1500.f);
+        bool inside=false;
+        for(auto& g:am.walls)if(g.x0>=am.minx&&g.x0<=am.maxx&&g.z0>=am.minz&&g.z0<=am.maxz){inside=true;break;}
+        CHECK(inside);
     }
     // Save / load round trip.
     {

@@ -5,6 +5,7 @@
 #include "../../core/SoftwareRenderer.h"
 #include "../../core/Font.h"
 #include "../../core/Ui.h"
+#include "../../core/Automap.h"
 #include "../../core/SaveGame.h"
 #include <cstdio>
 #include <cstring>
@@ -114,6 +115,23 @@ int main(int argc,char**argv){
             else if(uiMode=="help"){title="HELP";body=helpLines();}
             else if(uiMode=="log"){title="MESSAGE LOG";body=log.lines();tail=true;}
             else if(uiMode=="travel"){title="TRAVEL";std::vector<LocationEntry> tr;listRegionDungeons(maps,l.region,tr);int first=0;body=travelLines(tr,0,14,first,l.name);}
+            else if(uiMode=="map"){
+                AutomapData am;buildAutomap(dungeon,player.pos,yaw,1500.f,am);
+                int w=440,h=232,x=(480-w)/2,y=(272-h)/2;
+                for(int Y=y;Y<y+h;Y++)for(int X=x;X<x+w;X++)fb.color[Y*fb.w+X]=rgba(24,18,12);
+                for(int X=x;X<x+w;X++){fb.color[y*fb.w+X]=rgba(150,120,70);fb.color[(y+h-1)*fb.w+X]=rgba(150,120,70);}
+                for(int Y=y;Y<y+h;Y++){fb.color[Y*fb.w+x]=rgba(150,120,70);fb.color[Y*fb.w+x+w-1]=rgba(150,120,70);}
+                drawText(fb,font,(480-font.textWidth("MAP"))/2,y+4,"MAP",rgba(255,232,128));
+                float cxw=(am.minx+am.maxx)*0.5f,czw=(am.minz+am.maxz)*0.5f;
+                float sc=(w-24)/(am.maxx-am.minx);float s2=(h-44)/(am.maxz-am.minz);if(s2<sc)sc=s2;
+                float cx=x+w*0.5f,cy=y+20+(h-28)*0.5f;
+                auto seg=[&](const std::vector<MapSeg>& v,u32 col){
+                    for(auto& g:v)drawLine(fb,(int)(cx+(g.x0-cxw)*sc),(int)(cy-(g.z0-czw)*sc),
+                                              (int)(cx+(g.x1-cxw)*sc),(int)(cy-(g.z1-czw)*sc),col);
+                };
+                seg(am.walls,rgba(200,180,120));seg(am.doors,rgba(120,200,120));seg(am.marker,rgba(255,255,255));
+                body.clear();
+            }
             if(!body.empty()){
                 int total=(int)body.size();int lines=total>14?14:total;
                 int w=360,wh=4+16+lines*10+6,x=(480-w)/2,y=(272-wh)/2;

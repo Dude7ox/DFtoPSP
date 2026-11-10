@@ -12,6 +12,7 @@
 #include "../../core/Dungeon.h"
 #include "../../core/SaveGame.h"
 #include "../../core/Ui.h"
+#include "../../core/Automap.h"
 #include "PspRenderer.h"
 PSP_MODULE_INFO("DFtoPSP",0,0,3);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER|THREAD_ATTR_VFPU);
@@ -139,7 +140,7 @@ int main(int argc,char**argv){
             }
         }
         if(pressed&PSP_CTRL_TRIANGLE)noclip=!noclip;
-        if(pressed&PSP_CTRL_SELECT)win=(win+1)%5;
+        if(pressed&PSP_CTRL_SELECT)win=(win+1)%6;
         if(pressed&PSP_CTRL_START){
             SaveData out;out.player=player;out.player.pos=feet;out.player.yaw=yaw;out.player.pitch=pitch;
             out.region=layout.region;out.exteriorId=layout.exteriorId;out.dungeonName=layout.name;
@@ -205,6 +206,15 @@ int main(int argc,char**argv){
             else if(win==2)queueWindow(rr,font,fontSmall,"CHARACTER",charSheetLines(player,layout.name),false,10);
             else if(win==3)queueWindow(rr,font,fontSmall,"MESSAGE LOG",log.lines(),true,14);
             else if(win==4){int first=0;queueWindow(rr,font,fontSmall,"TRAVEL",travelLines(travel,travelCur,12,first,layout.name),false,12);}
+            else if(win==5){
+                AutomapData am;buildAutomap(dungeon,feet,yaw,1500.f,am);
+                int w=440,h=232,x=(480-w)/2,y=(272-h)/2;
+                rr.queueRect(x,y,w,h,rgba(24,18,12,224));
+                rr.queueRect(x,y,w,1,rgba(150,120,70,255));rr.queueRect(x,y+h-1,w,1,rgba(150,120,70,255));
+                rr.queueRect(x,y,1,h,rgba(150,120,70,255));rr.queueRect(x+w-1,y,1,h,rgba(150,120,70,255));
+                rr.queueText((480-font.textWidth("MAP"))/2,y+4,"MAP",rgba(255,232,128));
+                rr.queueMap(am,x+12,y+20,w-24,h-28);
+            }
         }
         rr.render(dungeon,cam,status,fps);
         if(!haveFont){

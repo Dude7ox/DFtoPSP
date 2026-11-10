@@ -1,4 +1,5 @@
 #include "SoftwareRenderer.h"
+#include "Cull.h"
 #include "Enemy.h"
 #include "Font.h"
 #include <algorithm>
@@ -56,8 +57,12 @@ struct Raster {
 void SoftwareRenderer::render(const Scene& s,const Camera& cam,Framebuffer& fb){
     std::fill(fb.color.begin(),fb.color.end(),0xff101018);std::fill(fb.depth.begin(),fb.depth.end(),0.f);
     Raster r;r.cam=&cam;r.fb=&fb;r.begin();
-    for(auto& t:s.tris)r.tri(t.v[0],t.v[1],t.v[2],texture(t.archive,t.record));
+    Frustum fr;frustumFromCamera(cam,(float)fb.w/(float)fb.h,2.f,4096.f,fr);
+    stats=Stats{};
+    for(auto& t:s.tris){if(!triInView(t,fr)){stats.culled++;continue;}stats.tris++;r.tri(t.v[0],t.v[1],t.v[2],texture(t.archive,t.record));}
     for(auto& fl:s.flats){
+        if(!sphereInView(fl.pos,(fl.w>fl.h?fl.w:fl.h)*0.7f,fr))continue;
+        stats.flats++;
         Texture& tex=texture(fl.archive,fl.record);
         Vec3 right{std::cos(cam.yaw),0,-std::sin(cam.yaw)};
         Vec3 p0=fl.pos-right*(fl.w*0.5f)+Vec3{0,fl.h,0};

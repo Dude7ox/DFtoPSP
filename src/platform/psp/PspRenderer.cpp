@@ -1,5 +1,6 @@
 #include "PspRenderer.h"
 #include "../../core/Automap.h"
+#include "../../core/Cull.h"
 #include <pspgu.h>
 #include <pspgum.h>
 #include <pspge.h>
@@ -119,16 +120,17 @@ PspRenderer::TexSlot& PspRenderer::getTex(int a,int r,int frame){
     sceKernelDcacheWritebackInvalidateRange(dst,w*h);
     s.archive=a;s.record=r;s.frame=frame;s.w=w;s.h=h;s.srcW=t.w;s.srcH=t.h;s.last=++tick_;return s;
 }
-void PspRenderer::drawScene(const Scene& s,const Camera& cam){
+void PspRenderer::drawScene(const Scene& s,const Camera& cam,const Frustum& fr){
     int n=0,curA=-1,curR=-1;
     auto flush=[&](){if(n>0){sceGumDrawArray(GU_TRIANGLES,GU_TEXTURE_32BITF|GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_3D,n,0,verts);n=0;}};
     auto bind=[&](int a,int r){TexSlot& ts=getTex(a,r);sceGuTexImage(0,ts.w,ts.h,ts.w,(void*)(uintptr_t)ts.offset);sceGuTexScale(1.f/ts.srcW,1.f/ts.srcH);curA=a;curR=r;};
-    auto tri=[&](const Tri& t){if(t.archive!=curA||t.record!=curR){flush();bind(t.archive,t.record);}if(n+3>4096)flush();for(int k=0;k<3;k++){const Vertex& v=t.v[k];verts[n++]={v.uv.x,v.uv.y,0xffffffff,v.p.x,v.p.y,v.p.z};}};
+    auto tri=[&](const Tri& t){if(!triInView(t,fr)){statCulled_++;return;}statTris_++;if(t.archive!=curA||t.record!=curR){flush();bind(t.archive,t.record);}if(n+3>4096)flush();for(int k=0;k<3;k++){const Vertex& v=t.v[k];verts[n++]={v.uv.x,v.uv.y,0xffffffff,v.p.x,v.p.y,v.p.z};}};
     sceGuTexMode(GU_PSM_T8,0,0,0);sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGBA);sceGuTexFilter(GU_NEAREST,GU_NEAREST);sceGuTexWrap(GU_REPEAT,GU_REPEAT);sceGuTexOffset(0,0);sceGuAmbientColor(0xffffffff);sceGuEnable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
     for(auto& t:s.tris)tri(t);for(auto& d:s.doors)for(auto& t:d.world)tri(t);flush();
     sceGuEnable(GU_BLEND);sceGuBlendFunc(GU_ADD,GU_SRC_ALPHA,GU_ONE_MINUS_SRC_ALPHA,0,0);
     for(auto& f:s.flats){
         if((f.pos-cam.pos).len()>2048.f)continue;
+        if(!sphereInView(f.pos,(f.w>f.h?f.w:f.h)*0.7f,fr))continue;
         TexSlot& ts=getTex(f.archive,f.record);sceGuTexImage(0,ts.w,ts.h,ts.w,(void*)(uintptr_t)ts.offset);sceGuTexScale(1.f/ts.srcW,1.f/ts.srcH);
         float cy=std::cos(cam.yaw),sy=std::sin(cam.yaw);Vec3 right{cy,0,-sy};
         Vec3 p0=f.pos-right*(f.w*0.5f)+Vec3{0,f.h,0},p1=f.pos+right*(f.w*0.5f)+Vec3{0,f.h,0},p2=f.pos+right*(f.w*0.5f),p3=f.pos-right*(f.w*0.5f);
@@ -230,7 +232,9 @@ void PspRenderer::render(const Dungeon& d,const Camera& cam,const char* status,f
     sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();sceGumRotateX(-cam.pitch);sceGumRotateY(-cam.yaw);ScePspFVector3 neg={-cam.pos.x,-cam.pos.y,-cam.pos.z};sceGumTranslate(&neg);
     sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
     sceGuClutMode(GU_PSM_8888,0,0xff,0);sceGuClutLoad(256/8,clut);
-    for(auto& r:d.resident())drawScene(r.scene,cam);
+    Frustum fr;frustumFromCamera(cam,480.f/272.f,2.f,4096.f,fr);
+    statTris_=0;statCulled_=0;
+    for(auto& r:d.resident())drawScene(r.scene,cam,fr);
     drawEnemies(d,cam);
     overlay(status,fps);
     sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);

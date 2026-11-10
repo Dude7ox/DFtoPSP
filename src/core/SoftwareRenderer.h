@@ -9,6 +9,8 @@ class SoftwareRenderer {
 public:
     SoftwareRenderer(const Vfs& vfs,const Palette& pal):vfs_(vfs),pal_(pal){}
     void render(const Scene& s,const Camera& cam,Framebuffer& fb);
+    struct Stats { int tris=0,culled=0,flats=0; };
+    Stats stats;
     void renderEnemies(const std::vector<Enemy>& enemies,const Camera& cam,Framebuffer& fb);
     Texture& texture(int a,int r);
     Texture& texture(int a,int r,int frame);

@@ -20,6 +20,8 @@ public:
     void render(const Dungeon& dungeon,const Camera& cam,const char* status,float fps);
     void swap();
     void term();
+    int trisLast()const{return statTris_;}
+    int culledLast()const{return statCulled_;}
     u32 drawOffset()const{return (swaps_&1)?512u*272u*2u:0u;}
 private:
     const Vfs* vfs_=nullptr; Palette pal_;
@@ -34,8 +36,9 @@ private:
     UiRect rects_[8]; int nRects_=0;
     struct UiLine { short x0,y0,x1,y1; u32 c; };
     std::vector<UiLine> mapLines_;
+    int statTris_=0,statCulled_=0;
     TexSlot& getTex(int a,int r,int frame=0);
-    void drawScene(const Scene& s,const Camera& cam);
+    void drawScene(const Scene& s,const Camera& cam,const struct Frustum& fr);
     void drawEnemies(const Dungeon& d,const Camera& cam);
     void overlay(const char* status,float fps);
     void drawQueuedText();

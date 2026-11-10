@@ -193,7 +193,7 @@ int main(int argc,char**argv){
         if(!(pressed&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE|PSP_CTRL_START)))
             snprintf(status,sizeof(status),"%s  %s  %.0f FPS",block,noclip?"NOCLIP":"",fps);
         char hud[96];
-        snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu%s%s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status[0]?"  ":"",status);
+        snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu %dfps%s%s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,(int)fps,status[0]?"  ":"",status);
         char hint[96];hint[0]=0;bool smallHint=false;
         if(win==0){
             if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");

@@ -36,10 +36,13 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
   max HP, skill and lockpick; locked doors can be picked.
 - Binary save/load (`DFPS` magic, format v2) covering player, progression,
   monsters, spawn/death keys; v1 saves still load.
+- Original `FONT000?.FNT` bitmap faces parse with a DFU-compatible reader
+  (header, 240-entry metric table, 16-bit row bitfields); FONT0001 (14 px gothic)
+  and FONT0003 (5x7) verified, and `drawText` blits with a 1 px drop shadow.
 - `tests/test_core` covers RLE texture parity, billboard scale, marker parse,
   wall line-of-sight, encounter rolls, simulation stability, a line-of-sight-verified
-  melee kill with XP/gold award, lockpick success rates, and the save/load round trip
-  (format v2; v1 saves remain readable).
+  melee kill with XP/gold award, lockpick success rates, FNT metrics/bitfields/blits,
+  and the save/load round trip (format v2; v1 saves remain readable).
 
 Screenshots from the host software renderer:
 - `docs/slice.png`: single-block view.
@@ -54,7 +57,10 @@ Screenshots from the host software renderer:
 - CPU texture uploads use `sceGeEdramGetAddr()`; GE commands use VRAM offsets.
 - 3×3 resident dungeon blocks, streamed as the player crosses 2048-unit block boundaries.
 - Door states are remembered per block instance while streaming.
-- HUD is drawn through `pspDebugScreen` into the current GE draw buffer.
+- HUD text is drawn through GE from a FONT0001 atlas baked into EDRAM
+  (256x256 T8 + dedicated CLUT, ~64 KB inside the 2 MB budget), with the classic
+  drop shadow; `pspDebugScreen` remains only as fallback and for fatal/diagnostic
+  screens. The host renderer blits the same faces into its framebuffer.
 - Exit callback thread, analog/DPad controls, noclip, gravity/floor snap, fall recovery.
 - Monster billboards animate per frame (T8 slots keyed by archive/record/frame),
   mirrored for the eastern orientations, with a depth-tested health bar.
@@ -83,9 +89,9 @@ Screenshots from the host software renderer:
 
 ## Known gaps
 
-- No inventory, quests, dialogue, audio, spells, automap, overworld, travel, or full UI;
-  the HUD uses the `pspDebugScreen` font because the original game fonts
-  (`TEXT.RSC` text bank / DFU converted SDF assets) are not decoded yet.
+- No inventory, quests, dialogue, audio, spells, automap, overworld, travel, or
+  UI windows yet; text now renders in the original game faces, so message/inventory
+  screens can be built on top of `Font`/`drawText` without further research.
 - Overworld travel is blocked by missing terrain data (`WOODS.WLD` is not part of the
   shipped freeware subset).
 - Only the test dungeon layout is wired into the PSP startup path.

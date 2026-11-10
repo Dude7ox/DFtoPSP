@@ -88,6 +88,7 @@ int main(int argc,char**argv){
         dungeon.setEnemies(es,sd.deadKeys,sd.spawnedKeys);
     }
     PspRenderer rr;if(!rr.init(vfs,pal))fatal("PSP GU renderer init failed");
+    Font font;font.load(vfs,"FONT0001.FNT");bool haveFont=rr.initFont(font);
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
@@ -153,14 +154,23 @@ int main(int argc,char**argv){
         size_t alive=0;for(auto& e:dungeon.enemies())if(e.state!=EnemyDead&&e.aggro)alive++;
         if(!(pressed&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE|PSP_CTRL_START)))
             snprintf(status,sizeof(status),"%s  %s  %.0f FPS",block,noclip?"NOCLIP":"",fps);
+        char hud[96];
+        snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu %-30s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status);
+        char hint[96];hint[0]=0;
+        if(help)snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");
+        else if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");
+        if(haveFont){
+            rr.queueText(4,2,hud,hurtFlash>0.f?rgba(255,80,80):rgba(255,255,255));
+            if(hint[0])rr.queueText(4,256,hint,rgba(255,232,128));
+        }
         rr.render(dungeon,cam,status,fps);
-        // Text overlay through the SDK debug screen, synchronized to the GE draw buffer.
-        pspDebugScreenSetOffset((int)rr.drawOffset());pspDebugScreenSetBackColor(0x00000000);
-        pspDebugScreenSetTextColor(hurtFlash>0.f?0x0000ff00:0xffffffff);
-        pspDebugScreenSetXY(0,0);pspDebugScreenPrintf("HP %3d/%3d Lv%d %dg aggro %zu %-30s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status);
-        pspDebugScreenSetXY(0,32);
-        if(help)pspDebugScreenPrintf("Stick move DPad look X door/pick Sq attack O run Start save");
-        else if(door)pspDebugScreenPrintf("%s",door->locked?"Locked door":"X: open / close door");
+        if(!haveFont){
+            // SDK debug screen fallback for data sets without FONT0001.FNT.
+            pspDebugScreenSetOffset((int)rr.drawOffset());pspDebugScreenSetBackColor(0x00000000);
+            pspDebugScreenSetTextColor(hurtFlash>0.f?0x0000ff00:0xffffffff);
+            pspDebugScreenSetXY(0,0);pspDebugScreenPrintf("%s",hud);
+            pspDebugScreenSetXY(0,32);pspDebugScreenPrintf("%s",hint);
+        }
         rr.swap();
     }
     rr.term();sceKernelExitGame();return 0;

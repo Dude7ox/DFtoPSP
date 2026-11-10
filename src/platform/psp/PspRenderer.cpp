@@ -13,6 +13,7 @@ static unsigned int __attribute__((aligned(16))) list[262144];
 struct GuVertex { float u,v; unsigned int color; float x,y,z; };
 static GuVertex __attribute__((aligned(16))) verts[4096];
 static u32 __attribute__((aligned(16))) clut[256];
+static u32 __attribute__((aligned(16))) textClut[256];
 // PSP GE expects VRAM offsets; CPU writes need the uncached EDRAM mapping.
 static inline void* cpuPtr(u32 offset){return (void*)((u8*)sceGeEdramGetAddr()+offset);}
 bool PspRenderer::init(const Vfs& vfs,const Palette& pal){
@@ -34,6 +35,64 @@ bool PspRenderer::init(const Vfs& vfs,const Palette& pal){
     sceGuClutMode(GU_PSM_8888,0,0xff,0);sceGuClutLoad(256/8,clut);
     sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
     sceDisplayWaitVblankStart();sceGuDisplay(GU_TRUE);return true;
+}
+bool PspRenderer::initFont(const Font& f){
+    if(!f.loaded())return false;
+    // The atlas lives behind the 48 world slots: 256x256 T8, 16x16 cells,
+    // 16 columns x 15 rows for all 240 glyphs (~64 KB of the 2 MB EDRAM).
+    fontBase_=texBase_+(u32)SLOTS*MAX_TEX*MAX_TEX;
+    u8* dst=(u8*)cpuPtr(fontBase_);
+    std::memset(dst,0,256*256);
+    for(int i=0;i<Font::kGlyphCount;i++){
+        char c=(char)(Font::kAsciiStart+i);
+        const u16* rows=f.rows(c);
+        if(!rows)continue;
+        int gx=(i%16)*16,gy=(i/16)*16;
+        int w=f.glyphWidth(c),h=f.fixedHeight();
+        for(int y=0;y<h&&y<16;y++)for(int x=0;x<w&&x<16;x++)
+            if(rows[y]&(0x8000u>>x))dst[(gy+y)*256+gx+x]=1;
+    }
+    sceKernelDcacheWritebackInvalidateRange(dst,256*256);
+    for(int i=0;i<256;i++)textClut[i]=0;
+    font_=&f;fontReady_=true;return true;
+}
+void PspRenderer::queueText(int x,int y,const char* s,u32 argb){
+    if(nLines_>=4)return;
+    TextLine& l=lines_[nLines_++];
+    l.x=x;l.y=y;l.c=argb;
+    std::strncpy(l.s,s,sizeof(l.s)-1);l.s[sizeof(l.s)-1]=0;
+}
+void PspRenderer::drawQueuedText(){
+    if(!fontReady_||nLines_==0)return;
+    sceGuTexMode(GU_PSM_T8,0,0,0);sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGBA);
+    sceGuTexFilter(GU_NEAREST,GU_NEAREST);sceGuTexWrap(GU_CLAMP,GU_CLAMP);
+    sceGuTexImage(0,256,256,256,(void*)(uintptr_t)fontBase_);
+    sceGuTexScale(1.f,1.f);sceGuTexOffset(0,0);
+    sceGuEnable(GU_TEXTURE_2D);
+    int h=font_->fixedHeight();
+    for(int pass=0;pass<2;pass++){                 // 0 = shadow, 1 = ink
+        int n=0;u32 lastColor=0;
+        auto flush=[&](){if(n){sceGuClutMode(GU_PSM_8888,0,0xff,0);sceGuClutLoad(256/8,textClut);sceGumDrawArray(GU_SPRITES,GU_TEXTURE_32BITF|GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n,0,verts);n=0;}};
+        for(int li=0;li<nLines_;li++){
+            TextLine& l=lines_[li];
+            u32 c=(pass==0)?0xff000000:l.c;
+            if(c!=lastColor){flush();textClut[1]=c;lastColor=c;}
+            int px=l.x+pass,py=l.y+pass;
+            for(const char* sp=l.s;*sp;++sp){
+                char ch=*sp;int w=font_->glyphWidth(ch);
+                const u16* rows=font_->rows(ch);
+                if(rows&&w>0){
+                    unsigned idx=(unsigned char)ch-Font::kAsciiStart;
+                    float gx=(float)((idx%16)*16),gy=(float)((idx/16)*16);
+                    if(n+2>4096)flush();
+                    verts[n++]={gx,gy,0xffffffff,(float)px,(float)py,0.f};
+                    verts[n++]={gx+(float)w,gy+(float)h,0xffffffff,(float)(px+w),(float)(py+h),0.f};
+                }
+                px+=font_->advance(ch);
+            }
+        }
+        flush();
+    }
 }
 PspRenderer::TexSlot& PspRenderer::getTex(int a,int r,int frame){
     for(auto& s:slots_)if(s.archive==a&&s.record==r&&s.frame==frame){s.last=++tick_;return s;}
@@ -117,8 +176,9 @@ void PspRenderer::overlay(const char* status,float fps){
     auto rect=[&](float x,float y,float w,float h,u32 c){if(n+2>4096)flush();verts[n++]={0,0,c,x,y,0};verts[n++]={0,0,c,x+w,y+h,0};};
     rect(238,134,5,1,0xc0ffffff);rect(240,132,1,5,0xc0ffffff);
     rect(0,0,480,18,0xa0000000);rect(0,254,480,18,0xa0000000);
-    // Status text is drawn by the caller through pspDebugScreen after GU sync.
-    flush();sceGuEnable(GU_DEPTH_TEST);
+    flush();
+    drawQueuedText();nLines_=0;
+    sceGuEnable(GU_DEPTH_TEST);
 }
 void PspRenderer::render(const Dungeon& d,const Camera& cam,const char* status,float fps){
     sceGuStart(GU_DIRECT,list);sceGuClearColor(0xff100c08);sceGuClearDepth(0);sceGuClear(GU_COLOR_BUFFER_BIT|GU_DEPTH_BUFFER_BIT);

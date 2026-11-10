@@ -88,7 +88,9 @@ int main(int argc,char**argv){
         dungeon.setEnemies(es,sd.deadKeys,sd.spawnedKeys);
     }
     PspRenderer rr;if(!rr.init(vfs,pal))fatal("PSP GU renderer init failed");
-    Font font;font.load(vfs,"FONT0001.FNT");bool haveFont=rr.initFont(font);
+    Font font;font.load(vfs,"FONT0001.FNT");
+    Font fontSmall;fontSmall.load(vfs,"FONT0003.FNT");
+    bool haveFont=rr.initFont(font,fontSmall);
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
@@ -155,13 +157,13 @@ int main(int argc,char**argv){
         if(!(pressed&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE|PSP_CTRL_START)))
             snprintf(status,sizeof(status),"%s  %s  %.0f FPS",block,noclip?"NOCLIP":"",fps);
         char hud[96];
-        snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu %-30s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status);
-        char hint[96];hint[0]=0;
-        if(help)snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");
+        snprintf(hud,sizeof(hud),"HP %3d/%3d Lv%d %dg aggro %zu%s%s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status[0]?"  ":"",status);
+        char hint[96];hint[0]=0;bool smallHint=false;
+        if(help){snprintf(hint,sizeof(hint),"Stick move DPad look X door/pick Sq attack O run Start save");smallHint=true;}
         else if(door)snprintf(hint,sizeof(hint),"%s",door->locked?"Locked door":"X: open / close door");
         if(haveFont){
             rr.queueText(4,2,hud,hurtFlash>0.f?rgba(255,80,80):rgba(255,255,255));
-            if(hint[0])rr.queueText(4,256,hint,rgba(255,232,128));
+            if(hint[0])rr.queueText(4,smallHint?259:256,hint,rgba(255,232,128),smallHint?&fontSmall:nullptr);
         }
         rr.render(dungeon,cam,status,fps);
         if(!haveFont){

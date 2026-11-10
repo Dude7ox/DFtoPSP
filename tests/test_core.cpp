@@ -11,6 +11,7 @@
 #include "../src/core/Font.h"
 #include "../src/core/Ui.h"
 #include "../src/core/Automap.h"
+#include "../src/core/Cull.h"
 #include "../src/core/SoftwareRenderer.h"
 #include "../src/core/Random.h"
 #include <cassert>
@@ -214,6 +215,23 @@ int main(int argc,char**argv){
         bool inside=false;
         for(auto& g:am.walls)if(g.x0>=am.minx&&g.x0<=am.maxx&&g.z0>=am.minz&&g.z0<=am.maxz){inside=true;break;}
         CHECK(inside);
+    }
+    // Frustum culling: geometry behind or beside the camera is rejected.
+    {
+        Camera cam;cam.pos=Vec3{0,64,0};cam.yaw=0;cam.pitch=0;
+        Frustum fr;frustumFromCamera(cam,480.f/272.f,2.f,4096.f,fr);
+        Tri in;for(int k=0;k<3;k++)in.v[k].p=Vec3{(float)(k-1)*10,64,200};
+        CHECK(triInView(in,fr));
+        Tri behind;for(int k=0;k<3;k++)behind.v[k].p=Vec3{(float)(k-1)*10,64,-200};
+        CHECK(!triInView(behind,fr));
+        Tri side;for(int k=0;k<3;k++)side.v[k].p=Vec3{2000+(float)k*10,64,100};
+        CHECK(!triInView(side,fr));
+        CHECK(sphereInView(Vec3{0,64,500},50,fr));
+        CHECK(!sphereInView(Vec3{0,64,-500},50,fr));
+        Camera cam2=cam;cam2.yaw=90.f;   // looking +X flips what is ahead
+        Frustum fr2;frustumFromCamera(cam2,480.f/272.f,2.f,4096.f,fr2);
+        CHECK(triInView(side,fr2));
+        CHECK(!triInView(in,fr2));
     }
     // Save / load round trip.
     {

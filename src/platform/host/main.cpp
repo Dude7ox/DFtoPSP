@@ -13,7 +13,7 @@
 using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
-    std::string uiMode;int region=16,exterior=18358;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
+    std::string uiMode;bool showStats=false;int region=16,exterior=18358;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
         else if(!strcmp(argv[i],"--block")&&i+1<argc)block=argv[++i];
@@ -33,6 +33,7 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--hurt"))hurt=true;
         else if(!strcmp(argv[i],"--kill"))kill=true;
         else if(!strcmp(argv[i],"--ui")&&i+1<argc)uiMode=argv[++i];
+        else if(!strcmp(argv[i],"--stats"))showStats=true;
         else if(!strcmp(argv[i],"--region")&&i+1<argc)region=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--exterior")&&i+1<argc)exterior=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
@@ -100,6 +101,8 @@ int main(int argc,char**argv){
         Scene merged;merged.blockName="dungeon";for(auto& r:dungeon.resident()){merged.tris.insert(merged.tris.end(),r.scene.tris.begin(),r.scene.tris.end());merged.flats.insert(merged.flats.end(),r.scene.flats.begin(),r.scene.flats.end());for(auto& d:r.scene.doors)merged.tris.insert(merged.tris.end(),d.world.begin(),d.world.end());}
         Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);Camera cam;cam.pos=haveCam?cpos:feet+Vec3{0,64.f,0};cam.yaw=yaw;cam.pitch=pitch;
         Framebuffer fb;fb.resize(w,h);SoftwareRenderer rr(vfs,pal);rr.render(merged,cam,fb);
+        if(showStats)fprintf(stderr,"stats: submitted %d tris, culled %d, flats %d of %zu tris\n",
+                             rr.stats.tris,rr.stats.culled,rr.stats.flats,merged.tris.size());
         if(withEnemies)rr.renderEnemies(dungeon.enemies(),cam,fb);
         // HUD text in the original FONT0001 face when the data provides it.
         Font font;font.load(vfs,"FONT0001.FNT");

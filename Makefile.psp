@@ -4,7 +4,7 @@ PSPSDK := $(PSPDEV)/psp/sdk
 CXX = $(PSPDEV)/bin/psp-g++
 CC = $(PSPDEV)/bin/psp-gcc
 TARGET = dfpsp
-OBJS = src/core/Vfs.o src/core/Bsa.o src/core/Texture.o src/core/Arch3d.o src/core/Rdb.o src/core/Maps.o src/core/Scene.o src/core/Dungeon.o src/core/Enemy.o src/core/EnemyData.o src/core/SaveGame.o src/core/Font.o src/core/Ui.o src/core/Automap.o src/platform/psp/main.o src/platform/psp/PspRenderer.o
+OBJS = src/core/Vfs.o src/core/Bsa.o src/core/Texture.o src/core/Arch3d.o src/core/Rdb.o src/core/Maps.o src/core/Scene.o src/core/Dungeon.o src/core/Enemy.o src/core/EnemyData.o src/core/SaveGame.o src/core/Font.o src/core/Ui.o src/core/Automap.o src/core/Cull.o src/platform/psp/main.o src/platform/psp/PspRenderer.o
 INCDIR = src $(PSPSDK)/include $(PSPDEV)/psp/include
 CXXFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 -fno-rtti -fno-exceptions $(addprefix -I,$(INCDIR))
 CFLAGS = -O2 -G0 -mno-gpopt -D_PSP_FW_VERSION=600 $(addprefix -I,$(INCDIR))

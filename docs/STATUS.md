@@ -88,6 +88,11 @@ Screenshots from the host software renderer:
   previously used `B,N,W,M,S`; with the wrong order most dungeons decoded to
   non-existent blocks (and the test dungeon silently loaded substitute blocks).
   All sampled region-16 locations now enter, including cemeteries.
+- Frustum culling (core `Cull`): six-plane test per wall triangle and a sphere
+  test for flats/doors billboards, shared by the GE and software renderers.
+  At the starting area 9076 of 14950 triangles are rejected before vertex
+  submission (61%) and the rendered frame stays pixel-identical; host `--stats`
+  prints submitted/culled counts. PSP HUD now shows the measured fps.
 - Automap window (Select cycle, sixth state): `buildAutomap()` projects the
   horizontal edges of vertical wall triangles of every resident block plus the
   door outlines and a player arrow into a north-up panel (core `Automap`,

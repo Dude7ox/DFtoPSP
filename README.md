@@ -30,7 +30,8 @@ Implemented:
   entry with the cursor + X; the saved location is restored on boot.
 - PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit.
 - Gravity, floor snapping, radius/height collision, fall recovery.
-- Host software renderer + CLI for validation and screenshots.
+- Host software renderer + CLI for validation and screenshots (`--stats` reports
+  frustum-culled triangle counts).
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:

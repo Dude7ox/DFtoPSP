@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 460 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 492,780 bytes (automap build, stripped)
-  - SHA-256: `8832bc5325d40910a32e9181622857cee797c1b7892f0ac9e1e54351e622eef2`
+  - `EBOOT.PBP`: 506,236 bytes (culling build, stripped)
+  - SHA-256: `cfe5e537f9a855a10c4563533a300f3542f20bf1b76c733ff831e4e7f7a175e8`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables

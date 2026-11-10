@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 455 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 1,392,328 bytes (monsters/combat/save build)
-  - SHA-256: `28cdc5c3145a059d99c6c8dc2ae86c0b35646c4bbac45883db7f5c169b043fc3`
+  - `EBOOT.PBP`: 1,404,148 bytes (boot-fix + progression/lockpicking build)
+  - SHA-256: `b032042d91fb0564ee60d7aecde857d2dba7ddc889252e1f68830d78b81cef35`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -32,11 +32,14 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
   wander, melee attack sequences with the original per-frame damage frame,
   hurt state, corpses that persist for the session.
 - Player combat: melee swing with hit chance and armour mitigation, HP, death
-  respawn at the dungeon entrance.
-- Binary save/load (`DFPS` magic) covering player, monsters, spawn/death keys.
+  respawn at the dungeon entrance; kills award XP/gold and level-ups raise
+  max HP, skill and lockpick; locked doors can be picked.
+- Binary save/load (`DFPS` magic, format v2) covering player, progression,
+  monsters, spawn/death keys; v1 saves still load.
 - `tests/test_core` covers RLE texture parity, billboard scale, marker parse,
-  wall line-of-sight, encounter rolls, simulation stability, melee and the
-  save/load round trip.
+  wall line-of-sight, encounter rolls, simulation stability, a line-of-sight-verified
+  melee kill with XP/gold award, lockpick success rates, and the save/load round trip
+  (format v2; v1 saves remain readable).
 
 Screenshots from the host software renderer:
 - `docs/slice.png`: single-block view.
@@ -55,13 +58,23 @@ Screenshots from the host software renderer:
 - Exit callback thread, analog/DPad controls, noclip, gravity/floor snap, fall recovery.
 - Monster billboards animate per frame (T8 slots keyed by archive/record/frame),
   mirrored for the eastern orientations, with a depth-tested health bar.
-- Square swings the weapon, Start writes `SAVE0.DFS` next to the data folder and
-  the game restores it on boot.
+- Square swings the weapon; X opens doors and picks locked ones (chance scales with
+  the lockpick skill and level; failure aggros monsters near the door).
+- Kills award XP and gold; level-ups raise max HP (full heal), skill and lockpick.
+  HUD shows level and gold; save format v2 stores progression (v1 saves still load).
+- Start writes `SAVE0.DFS` next to the data folder and the game restores it on boot.
+- Boot mounts every existing data candidate as a VFS root (`data/`, `data/ARENA2/`,
+  `ms0:`/`ef0:`/`host0:` game-directory variants, nested `ARENA2/`, relative fallbacks);
+  mod lists are loaded from the game base, the save directory and the working directory.
+- A fatal missing-file error prints an on-device diagnostics panel: `sceIoGetcwd`,
+  a directory probe per candidate root, an `fopen` probe per mounted root and a
+  stdio write/read self-test in the save directory.
 
 ## Not validated
 
-- Real PSP execution.
-- PPSSPP execution.
+- Real PSP execution beyond the boot screen: the previous EBOOT was confirmed to run on
+  PPSSPP and a PSP-3000 up to the missing-data fatal (user report); this build changes the
+  data-root discovery and adds the diagnostics panel, but has not been run on a device yet.
 - Frame rate on hardware.
 - Long-play stability and memory fragmentation.
 - Full collision robustness across all blocks.
@@ -70,8 +83,11 @@ Screenshots from the host software renderer:
 
 ## Known gaps
 
-- No enemies, combat, AI, inventory, character progression, quests, dialogue, saves, audio,
-  spells, automap, overworld, travel, or full UI.
+- No inventory, quests, dialogue, audio, spells, automap, overworld, travel, or full UI;
+  the HUD uses the `pspDebugScreen` font because the original game fonts
+  (`TEXT.RSC` text bank / DFU converted SDF assets) are not decoded yet.
+- Overworld travel is blocked by missing terrain data (`WOODS.WLD` is not part of the
+  shipped freeware subset).
 - Only the test dungeon layout is wired into the PSP startup path.
 - Data provenance limitations remain; see `DATA.md`.
 - The manually bootstrapped PSPSDK link emits `psp-fixup-imports` ordering warnings in this

@@ -5,6 +5,7 @@
 #include <pspdebug.h>
 #include <pspge.h>
 #include <pspiofilemgr.h>
+#include <unistd.h>
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -20,24 +21,62 @@ static int exitCallback(int arg1,int arg2,void* common){(void)arg1;(void)arg2;(v
 static int callbackThread(SceSize args,void* argp){(void)args;(void)argp;int cb=sceKernelCreateCallback("exit",exitCallback,nullptr);sceKernelRegisterExitCallback(cb);sceKernelSleepThreadCB();return 0;}
 static void setupExit(){int th=sceKernelCreateThread("exit_cb",callbackThread,0x11,0x1000,THREAD_ATTR_USER,0);if(th>=0)sceKernelStartThread(th,0,nullptr);}
 static bool dirExists(const char* p){SceIoStat st;return sceIoGetstat(p,&st)>=0&&(st.st_mode&FIO_S_IFDIR);}
+static bool fileOpens(const char* p){FILE* f=fopen(p,"rb");if(!f)return false;fclose(f);return true;}
 static void fatal(const char* msg){pspDebugScreenInit();pspDebugScreenPrintf("DFtoPSP\n\n%s\n\nPress HOME to exit.\n",msg);while(!exitRequested)sceDisplayWaitVblankStart();sceKernelExitGame();}
+// Boot diagnostics: every candidate root, the cwd and a stdio self test, so a
+// device failure names the path that did not work instead of guessing.
+static void fatalDiag(const char* msg,const std::string& diag){
+    pspDebugScreenInit();
+    pspDebugScreenPrintf("DFtoPSP\n\n%s\n\n%s\nPress HOME to exit.\n",msg,diag.c_str());
+    while(!exitRequested)sceDisplayWaitVblankStart();
+    sceKernelExitGame();
+}
 int main(int argc,char**argv){
     (void)argc;(void)argv;setupExit();
     sceCtrlSetSamplingCycle(0);sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
-    const char* roots[]={"data","ms0:/PSP/GAME/DFtoPSP/data","ms0:/PSP/GAME/DFtoPSP/data/ARENA2","host0:/data"};
-    Vfs vfs;bool found=false;std::string base=".";
-    for(auto r:roots){if(dirExists(r)){vfs.addRoot(r);found=true;base=r;break;}}
-    if(!found)vfs.addRoot("data");vfs.addRoot("data/ARENA2");vfs.loadModList(".");
-    // SAVE0.DFS sits next to the data folder so saves survive on the memory stick.
-    std::string savePath=base;
-    if(savePath.size()>5&&savePath.compare(savePath.size()-5,5,"/data")==0)savePath=savePath.substr(0,savePath.size()-5);
-    savePath+="/SAVE0.DFS";
+    // Every layout that ever shipped: relative to the current directory, the
+    // classic memstick path, internal storage (PSP Go) and the host bridge.
+    // All existing candidates become roots; no first-match break, so a nested
+    // data/ARENA2 layout works regardless of the emulated current directory.
+    const char* cand[]={
+        "data","data/ARENA2",
+        "ms0:/PSP/GAME/DFtoPSP/data","ms0:/PSP/GAME/DFtoPSP/data/ARENA2",
+        "ef0:/PSP/GAME/DFtoPSP/data","ef0:/PSP/GAME/DFtoPSP/data/ARENA2",
+        "host0:/data","host0:/data/ARENA2"};
+    Vfs vfs;std::string base;
+    for(auto c:cand)if(dirExists(c)){vfs.addRoot(c);if(base.empty())base=c;}
+    if(!base.empty()){std::string arena2=base+"/ARENA2";if(dirExists(arena2.c_str()))vfs.addRoot(arena2);}
+    vfs.addRoot("data");vfs.addRoot("data/ARENA2");
+    if(base.empty())base="data";
+    // SAVE0.DFS sits next to the game folder so saves survive on the stick.
+    std::string saveDir=base;
+    if(saveDir.size()>7&&saveDir.compare(saveDir.size()-7,7,"/ARENA2")==0)saveDir=saveDir.substr(0,saveDir.size()-7);
+    if(saveDir.size()>5&&saveDir.compare(saveDir.size()-5,5,"/data")==0)saveDir=saveDir.substr(0,saveDir.size()-5);
+    if(saveDir.empty())saveDir=".";
+    vfs.loadModList(base);vfs.loadModList(saveDir);vfs.loadModList(".");
+    std::string savePath=saveDir+"/SAVE0.DFS";
+    auto bootDiag=[&](const char* missing)->std::string{
+        char cwd[128]="?";if(!getcwd(cwd,sizeof(cwd)))cwd[0]='?';
+        char line[160];std::string out;
+        snprintf(line,sizeof(line),"cwd=%s\n",cwd);out+=line;
+        for(auto c:cand){snprintf(line,sizeof(line),"[%s] %s\n",dirExists(c)?"dir":" . ",c);out+=line;}
+        for(auto& r:vfs.roots()){
+            snprintf(line,sizeof(line),"[%s] %s/%s\n",fileOpens((r+"/"+missing).c_str())?"file":" . ",r.c_str(),missing);
+            out+=line;
+        }
+        std::string tp=saveDir+"/_iotest.txt";
+        FILE* f=fopen(tp.c_str(),"wb");bool wok=f&&fwrite("ok",1,2,f)==2;if(f)fclose(f);
+        f=fopen(tp.c_str(),"rb");char b[4]={0,0,0,0};bool rok=f&&fread(b,1,2,f)==2&&b[0]=='o';if(f)fclose(f);
+        remove(tp.c_str());
+        snprintf(line,sizeof(line),"stdio wr=%d rd=%d at %s\n",wok?1:0,rok?1:0,saveDir.c_str());out+=line;
+        return out;
+    };
     Bsa arch3d,blocks,maps,monsters;
-    if(!arch3d.open(vfs,"ARCH3D.BSA"))fatal("Missing data/ARENA2/ARCH3D.BSA");
-    if(!blocks.open(vfs,"BLOCKS.BSA"))fatal("Missing data/ARENA2/BLOCKS.BSA");
-    if(!maps.open(vfs,"MAPS.BSA"))fatal("Missing data/ARENA2/MAPS.BSA");
+    if(!arch3d.open(vfs,"ARCH3D.BSA"))fatalDiag("Missing ARCH3D.BSA",bootDiag("ARCH3D.BSA"));
+    if(!blocks.open(vfs,"BLOCKS.BSA"))fatalDiag("Missing BLOCKS.BSA",bootDiag("BLOCKS.BSA"));
+    if(!maps.open(vfs,"MAPS.BSA"))fatalDiag("Missing MAPS.BSA",bootDiag("MAPS.BSA"));
     bool haveMonsters=monsters.open(vfs,"MONSTER.BSA");
-    Palette pal;if(!loadPalette(vfs,"ART_PAL.COL",pal))fatal("Missing ART_PAL.COL");
+    Palette pal;if(!loadPalette(vfs,"ART_PAL.COL",pal))fatalDiag("Missing ART_PAL.COL",bootDiag("ART_PAL.COL"));
     DungeonLayout layout;if(!loadDungeonLayout(maps,16,18358,layout))fatal("Cannot load test dungeon layout");
     PlayerState player;
     SaveData sd;bool restored=false;
@@ -89,7 +128,12 @@ int main(int argc,char**argv){
         Camera cam;cam.pos=feet+Vec3{0,64.f,0};cam.yaw=yaw;cam.pitch=pitch;
         Vec3 look{std::sin(yaw)*std::cos(pitch),std::sin(pitch),std::cos(yaw)*std::cos(pitch)};
         Door* door=dungeon.aimedDoor(cam.pos,look);
-        if((pressed&PSP_CTRL_CROSS)&&door){if(!toggleDoor(*door))snprintf(status,sizeof(status),"LOCKED");}
+        if((pressed&PSP_CTRL_CROSS)&&door){
+            if(door->locked){
+                if(dungeon.pickLock(player,*door)){snprintf(status,sizeof(status),"LOCK PICKED");toggleDoor(*door);}
+                else snprintf(status,sizeof(status),"LOCKED");
+            }else toggleDoor(*door);
+        }
         if((pressed&PSP_CTRL_SQUARE)&&player.attackCooldown<=0.f&&!player.dead){
             player.attackCooldown=0.8f;
             int dmg=dungeon.playerAttack(player,look);
@@ -113,9 +157,9 @@ int main(int argc,char**argv){
         // Text overlay through the SDK debug screen, synchronized to the GE draw buffer.
         pspDebugScreenSetOffset((int)rr.drawOffset());pspDebugScreenSetBackColor(0x00000000);
         pspDebugScreenSetTextColor(hurtFlash>0.f?0x0000ff00:0xffffffff);
-        pspDebugScreenSetXY(0,0);pspDebugScreenPrintf("HP %3d/%3d  Lv%d  aggro %zu  %-40s",player.hp>0?player.hp:0,player.maxHp,player.level,alive,status);
+        pspDebugScreenSetXY(0,0);pspDebugScreenPrintf("HP %3d/%3d Lv%d %dg aggro %zu %-30s",player.hp>0?player.hp:0,player.maxHp,player.level,player.gold,alive,status);
         pspDebugScreenSetXY(0,32);
-        if(help)pspDebugScreenPrintf("Stick move DPad look X door Sq attack O run Start save Sel help");
+        if(help)pspDebugScreenPrintf("Stick move DPad look X door/pick Sq attack O run Start save");
         else if(door)pspDebugScreenPrintf("%s",door->locked?"Locked door":"X: open / close door");
         rr.swap();
     }

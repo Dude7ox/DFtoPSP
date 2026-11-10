@@ -96,9 +96,9 @@ int main(int argc,char**argv){
         if(withEnemies)rr.renderEnemies(dungeon.enemies(),cam,fb);
         if(!writeBmp(out,fb))return 1;
         size_t alive=0,dead=0;for(auto& e:dungeon.enemies())(e.state==EnemyDead?dead:alive)++;
-        fprintf(stderr,"dungeon: %zu resident blocks, %zu tris, spawn %.0f %.0f %.0f, monsters %zu alive %zu dead %zu (book %s)\n",
+        fprintf(stderr,"dungeon: %zu resident blocks, %zu tris, spawn %.0f %.0f %.0f, monsters %zu alive %zu dead %zu, player Lv%d xp%d %dg (book %s)\n",
             dungeon.resident().size(),dungeon.triangleCount(),dungeon.spawn().x,dungeon.spawn().y,dungeon.spawn().z,
-            dungeon.enemies().size(),alive,dead,haveMonsters?"MONSTER.BSA":"static");
+            dungeon.enemies().size(),alive,dead,player.level,player.xp,player.gold,haveMonsters?"MONSTER.BSA":"static");
         for(auto& e:dungeon.enemies()){
             if(e.state==EnemyDead)continue;
             Vec3 d=e.pos-feet;

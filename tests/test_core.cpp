@@ -82,16 +82,38 @@ int main(int argc,char**argv){
         player.hp-=dmg;
     }
     for(auto& e:dungeon.enemies()){CHECK(std::isfinite(e.pos.x));CHECK(e.hp>=0&&e.hp<=e.maxHp);}
-    // Melee: an enemy placed in front must take damage or die from a swing.
+    // Melee: an enemy placed down the open corridor must die to repeated swings.
+    Vec3 corridor{std::sin(-1.82f),0,std::cos(-1.82f)};
     {
         std::vector<Enemy> es=dungeon.enemies();
         CHECK(!es.empty());
-        es[0].pos=sp+Vec3{0,0,60};es[0].state=EnemyMove;es[0].hp=es[0].maxHp;
+        es[0].pos=sp+corridor*100.f;es[0].state=EnemyMove;es[0].hp=es[0].maxHp;
         dungeon.setEnemies(es,dungeon.deadKeys(),dungeon.spawnedKeys());
         int before=dungeon.enemies()[0].hp;
-        int dealt=0;for(int i=0;i<40&&dealt==0;i++)dealt=dungeon.playerAttack(player,Vec3{0,0,1});
-        CHECK(dealt>=0);
-        CHECK(dungeon.enemies()[0].hp<=before);
+        int dealt=0;for(int i=0;i<40&&dealt==0;i++)dealt=dungeon.playerAttack(player,corridor);
+        CHECK(dealt>0);
+        CHECK(dungeon.enemies()[0].hp<before);
+    }
+    // Progression: defeating the placed enemy grants xp and gold.
+    {
+        PlayerState pr;pr.pos=sp;
+        std::vector<Enemy> es=dungeon.enemies();
+        es[0].pos=sp+corridor*100.f;es[0].hp=1;es[0].maxHp=1;es[0].state=EnemyMove;
+        dungeon.setEnemies(es,dungeon.deadKeys(),dungeon.spawnedKeys());
+        int xpBefore=pr.xp,goldBefore=pr.gold;
+        for(int i=0;i<300&&dungeon.enemies()[0].state!=EnemyDead;i++)dungeon.playerAttack(pr,corridor);
+        CHECK(dungeon.enemies()[0].state==EnemyDead);
+        CHECK(pr.xp>xpBefore);CHECK(pr.gold>goldBefore);
+    }
+    // Lockpicking eventually opens a locked door and never wedges the state.
+    {
+        Door* locked=nullptr;
+        for(auto& r:dungeon.resident())for(auto& d:r.scene.doors)if(d.locked){locked=&d;break;}
+        CHECK(locked!=nullptr);
+        PlayerState pr;pr.lockpick=80;pr.level=5;
+        bool opened=false;
+        for(int i=0;i<300&&!opened;i++)opened=dungeon.pickLock(pr,*locked);
+        CHECK(opened);CHECK(!locked->locked);
     }
     // Save / load round trip.
     {

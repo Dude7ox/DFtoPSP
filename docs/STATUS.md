@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 460 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 489,068 bytes (travel build, stripped)
-  - SHA-256: `51a788781bdf1fe43f8bd7b4c5ddfaf6f96d5d8509c95e6d1cdbda409e6f53c0`
+  - `EBOOT.PBP`: 492,780 bytes (automap build, stripped)
+  - SHA-256: `8832bc5325d40910a32e9181622857cee797c1b7892f0ac9e1e54351e622eef2`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -88,6 +88,10 @@ Screenshots from the host software renderer:
   previously used `B,N,W,M,S`; with the wrong order most dungeons decoded to
   non-existent blocks (and the test dungeon silently loaded substitute blocks).
   All sampled region-16 locations now enter, including cemeteries.
+- Automap window (Select cycle, sixth state): `buildAutomap()` projects the
+  horizontal edges of vertical wall triangles of every resident block plus the
+  door outlines and a player arrow into a north-up panel (core `Automap`,
+  host `--ui map`, PSP GE `GU_LINES` via `queueMap`), `docs/automap.png`.
 - Combat accuracy fix: `enemySwingHits`/`playerSwingHits` compared
   `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
   never land a blow; both now scale to percent and player swings roll to hit

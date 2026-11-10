@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include "../../core/Dungeon.h"
 #include "../../core/Font.h"
 #include "../../core/SoftwareRenderer.h"
@@ -14,6 +15,8 @@ public:
     void queueText(int x,int y,const char* s,u32 argb,const Font* f=nullptr);
     // Translucent panel rectangle queued with the text (window backgrounds).
     void queueRect(int x,int y,int w,int h,u32 argb);
+    // Automap segments (already in world units) mapped into a panel rect.
+    void queueMap(const struct AutomapData& m,int px,int py,int pw,int ph);
     void render(const Dungeon& dungeon,const Camera& cam,const char* status,float fps);
     void swap();
     void term();
@@ -29,6 +32,8 @@ private:
     TextLine lines_[20]; int nLines_=0;
     struct UiRect { int x=0,y=0,w=0,h=0; u32 c=0; };
     UiRect rects_[8]; int nRects_=0;
+    struct UiLine { short x0,y0,x1,y1; u32 c; };
+    std::vector<UiLine> mapLines_;
     TexSlot& getTex(int a,int r,int frame=0);
     void drawScene(const Scene& s,const Camera& cam);
     void drawEnemies(const Dungeon& d,const Camera& cam);

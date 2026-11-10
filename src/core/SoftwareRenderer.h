@@ -19,4 +19,5 @@ private:
 bool writeBmp(const std::string& path,const Framebuffer& fb);
 // Original-font text blit with an optional 1px black drop shadow.
 void drawText(Framebuffer& fb,const Font& f,int x,int y,const std::string& s,u32 argb,bool shadow=true);
+void drawLine(Framebuffer& fb,int x0,int y0,int x1,int y1,u32 argb);
 } // namespace

@@ -25,4 +25,20 @@ std::vector<std::string> helpLines(){
         "Home exit",
     };
 }
+std::vector<std::string> travelLines(const std::vector<LocationEntry>& e,int cursor,int maxLines,int& first,
+                                      const std::string& currentName){
+    std::vector<std::string> out;
+    int total=(int)e.size(); if(total<=0){first=0;return out;}
+    if(cursor<0)cursor=0; if(cursor>=total)cursor=total-1;
+    first=cursor-maxLines/2; if(first<0)first=0;
+    if(first+maxLines>total)first=total-maxLines; if(first<0)first=0;
+    int n=total-first; if(n>maxLines)n=maxLines;
+    for(int i=0;i<n;i++){
+        const LocationEntry& le=e[(size_t)(first+i)];
+        std::string line=(first+i==cursor?"> ":"  ")+le.name;
+        if(le.name==currentName)line+=" *";
+        out.push_back(line);
+    }
+    return out;
+}
 } // namespace

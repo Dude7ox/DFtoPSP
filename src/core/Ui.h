@@ -1,5 +1,6 @@
 #pragma once
 #include "Player.h"
+#include "Maps.h"
 #include <string>
 #include <vector>
 namespace dfpsp {
@@ -18,4 +19,8 @@ private:
 // platforms show identical panels. Titles use FONT0001, bodies FONT0003.
 std::vector<std::string> charSheetLines(const PlayerState& p,const std::string& place);
 std::vector<std::string> helpLines();
+// Visible slice of the travel list with the cursor marked; returns lines and
+// sets first to the index of the first visible entry.
+std::vector<std::string> travelLines(const std::vector<LocationEntry>& e,int cursor,int maxLines,int& first,
+                                      const std::string& currentName);
 } // namespace

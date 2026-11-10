@@ -77,6 +77,17 @@ Screenshots from the host software renderer:
 - The message log is a 32-line ring fed by hits, misses, kills, level-ups,
   lockpick results and monster damage; the CHARACTER sheet shows level, XP,
   HP, armor, weapon skill, lockpicking, gold, kills and the dungeon name.
+- Travel: `listRegionDungeons()` joins MAPNAMES/MAPPITEM/MAPDITEM into the classic
+  per-region dungeon list (571 enterable locations in region 16); the TRAVEL window
+  scrolls it with the DPad and X enters the selected dungeon (career persists,
+  per-dungeon state resets). Boot restores the saved region/exteriorId location.
+  World simulation pauses while any window is open. `docs/travel.png`.
+- Location names: `loadDungeonLayout()` now resolves the full 32-character MAPNAMES
+  name; the in-record name is only a truncated tail of it.
+- Block-name fix: the RDB letter table followed DFU's `N,W,L,S,B,M` order, not the
+  previously used `B,N,W,M,S`; with the wrong order most dungeons decoded to
+  non-existent blocks (and the test dungeon silently loaded substitute blocks).
+  All sampled region-16 locations now enter, including cemeteries.
 - Combat accuracy fix: `enemySwingHits`/`playerSwingHits` compared
   `DfRandom::percent()` (1..100) against a 0..1 fraction, so monsters could
   never land a blow; both now scale to percent and player swings roll to hit

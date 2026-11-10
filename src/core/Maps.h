@@ -1,5 +1,7 @@
 #pragma once
 #include "Bsa.h"
+#include <vector>
+#include <string>
 namespace dfpsp {
 struct DungeonBlockRef { int x=0,z=0; std::string name; bool start=false; };
 struct DungeonLayout {
@@ -8,5 +10,8 @@ struct DungeonLayout {
     std::string name; std::vector<DungeonBlockRef> blocks;
 };
 bool loadDungeonLayout(const Bsa& maps,int region,int exteriorId,DungeonLayout& out);
+// Every dungeon location of a region, for the classic travel list.
+struct LocationEntry { int exteriorId=0; std::string name; int dungeonType=255; };
+bool listRegionDungeons(const Bsa& maps,int region,std::vector<LocationEntry>& out);
 bool findDungeonByName(const Bsa& maps,const std::string& needle,DungeonLayout& out);
 } // namespace

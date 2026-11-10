@@ -97,7 +97,10 @@ int main(int argc,char**argv){
     DungeonLayout layout;if(!loadDungeonLayout(maps,16,18358,layout))fatal("Cannot load test dungeon layout");
     PlayerState player;
     SaveData sd;bool restored=false;
-    if(readSave(savePath,sd)&&sd.dungeonName==layout.name){player=sd.player;restored=true;}
+    if(readSave(savePath,sd)){
+        DungeonLayout saved;
+        if(loadDungeonLayout(maps,sd.region,sd.exteriorId,saved)&&saved.name==sd.dungeonName){layout=saved;player=sd.player;restored=true;}
+    }
     Dungeon dungeon(vfs,arch3d,blocks,monsters);
     if(!dungeon.enter(layout,player.level))fatal("Cannot load starting dungeon block");
     if(restored){
@@ -111,7 +114,8 @@ int main(int argc,char**argv){
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
-    bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log
+    bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log, 4 travel
+    std::vector<LocationEntry> travel;listRegionDungeons(maps,layout.region,travel);int travelCur=0;
     SceCtrlData pad{},old{};u64 last=sceKernelGetSystemTimeWide();float fps=60.f;u32 frames=0;float fpsTimer=0.f;
     char status[160];status[0]=0;
     MsgLog log;dungeon.setLog(&log);log.push("You enter "+layout.name+".");
@@ -121,8 +125,21 @@ int main(int argc,char**argv){
         if(pad.Buttons&PSP_CTRL_HOME)break;
         u64 now=sceKernelGetSystemTimeWide();float dt=(float)(now-last)/1000000.f;last=now;if(dt>0.1f)dt=0.1f;if(dt<=0)dt=1.f/60.f;
         fpsTimer+=dt;frames++;if(fpsTimer>=0.5f){fps=frames/fpsTimer;frames=0;fpsTimer=0;}
+        bool world=win==0;
+        if(win==4){
+            if(pressed&PSP_CTRL_UP&&travelCur>0)travelCur--;
+            if(pressed&PSP_CTRL_DOWN&&travelCur+1<(int)travel.size())travelCur++;
+            if((pressed&PSP_CTRL_CROSS)&&!travel.empty()){
+                DungeonLayout nl;
+                if(loadDungeonLayout(maps,layout.region,travel[travelCur].exteriorId,nl)&&dungeon.enter(nl,player.level)){
+                    layout=nl;feet=dungeon.spawn();yaw=0.5f;pitch=-0.05f;vertical=0;
+                    log.push("You travel to "+layout.name+".");
+                    snprintf(status,sizeof(status),"TRAVELED");
+                }else snprintf(status,sizeof(status),"TRAVEL FAILED");
+            }
+        }
         if(pressed&PSP_CTRL_TRIANGLE)noclip=!noclip;
-        if(pressed&PSP_CTRL_SELECT)win=(win+1)%4;
+        if(pressed&PSP_CTRL_SELECT)win=(win+1)%5;
         if(pressed&PSP_CTRL_START){
             SaveData out;out.player=player;out.player.pos=feet;out.player.yaw=yaw;out.player.pitch=pitch;
             out.region=layout.region;out.exteriorId=layout.exteriorId;out.dungeonName=layout.name;
@@ -130,7 +147,7 @@ int main(int argc,char**argv){
             out.deadKeys=dungeon.deadKeys();out.spawnedKeys=dungeon.spawnedKeys();
             snprintf(status,sizeof(status),writeSave(savePath,out)?"SAVED":"SAVE FAILED");
         }
-        float lx=(pad.Lx-128)/128.f,ly=(pad.Ly-128.f)/128.f;if(std::fabs(lx)<0.15f)lx=0;if(std::fabs(ly)<0.15f)ly=0;
+        float lx=world?(pad.Lx-128)/128.f:0.f,ly=world?(pad.Ly-128.f)/128.f:0.f;if(std::fabs(lx)<0.15f)lx=0;if(std::fabs(ly)<0.15f)ly=0;
         float speed=(pad.Buttons&PSP_CTRL_CIRCLE)?360.f:200.f;Vec3 fwd{std::sin(yaw),0,std::cos(yaw)},right{std::cos(yaw),0,-std::sin(yaw)};
         Vec3 delta=fwd*(-ly*speed*dt)+right*(lx*speed*dt);
         if(noclip){feet=feet+delta;feet.y+=((pad.Buttons&PSP_CTRL_RTRIGGER)?120.f:0.f)*dt-((pad.Buttons&PSP_CTRL_LTRIGGER)?120.f:0.f)*dt;}
@@ -140,8 +157,8 @@ int main(int argc,char**argv){
             if(fy>-100.f){feet.y=fy;vertical=0;}else{vertical-=900.f*dt;feet.y+=vertical*dt;float below=dungeon.floor(feet,feet.y+4.f);if(below>-100.f&&feet.y<=below){feet.y=below;vertical=0;}}
             if(feet.y<-2000.f){feet=dungeon.spawn();vertical=0;}
         }
-        if(pad.Buttons&PSP_CTRL_LEFT)yaw-=1.8f*dt;if(pad.Buttons&PSP_CTRL_RIGHT)yaw+=1.8f*dt;
-        if(pad.Buttons&PSP_CTRL_UP)pitch+=1.2f*dt;if(pad.Buttons&PSP_CTRL_DOWN)pitch-=1.2f*dt;
+        if(world&&pad.Buttons&PSP_CTRL_LEFT)yaw-=1.8f*dt;if(world&&pad.Buttons&PSP_CTRL_RIGHT)yaw+=1.8f*dt;
+        if(world&&pad.Buttons&PSP_CTRL_UP)pitch+=1.2f*dt;if(world&&pad.Buttons&PSP_CTRL_DOWN)pitch-=1.2f*dt;
         if(pitch>1.2f)pitch=1.2f;if(pitch<-1.2f)pitch=-1.2f;
         player.attackCooldown-=dt;hurtFlash-=dt;
         dungeon.update(feet);dungeon.tick(dt);
@@ -149,19 +166,19 @@ int main(int argc,char**argv){
         Camera cam;cam.pos=feet+Vec3{0,64.f,0};cam.yaw=yaw;cam.pitch=pitch;
         Vec3 look{std::sin(yaw)*std::cos(pitch),std::sin(pitch),std::cos(yaw)*std::cos(pitch)};
         Door* door=dungeon.aimedDoor(cam.pos,look);
-        if((pressed&PSP_CTRL_CROSS)&&door){
+        if(world&&(pressed&PSP_CTRL_CROSS)&&door){
             if(door->locked){
                 if(dungeon.pickLock(player,*door)){snprintf(status,sizeof(status),"LOCK PICKED");toggleDoor(*door);}
                 else snprintf(status,sizeof(status),"LOCKED");
             }else toggleDoor(*door);
         }
-        if((pressed&PSP_CTRL_SQUARE)&&player.attackCooldown<=0.f&&!player.dead){
+        if(world&&(pressed&PSP_CTRL_SQUARE)&&player.attackCooldown<=0.f&&!player.dead){
             player.attackCooldown=0.8f;
             int dmg=dungeon.playerAttack(player,look);
             if(dmg>0)snprintf(status,sizeof(status),"HIT %d",dmg);
             else snprintf(status,sizeof(status),"MISS");
         }
-        int hurt=dungeon.tickEnemies(dt,player,look);
+        int hurt=world?dungeon.tickEnemies(dt,player,look):0;
         if(hurt>0){
             player.hp-=hurt;hurtFlash=0.6f;
             snprintf(status,sizeof(status),"-%d HP",hurt);
@@ -187,6 +204,7 @@ int main(int argc,char**argv){
             if(win==1)queueWindow(rr,font,fontSmall,"HELP",helpLines(),false,8);
             else if(win==2)queueWindow(rr,font,fontSmall,"CHARACTER",charSheetLines(player,layout.name),false,10);
             else if(win==3)queueWindow(rr,font,fontSmall,"MESSAGE LOG",log.lines(),true,14);
+            else if(win==4){int first=0;queueWindow(rr,font,fontSmall,"TRAVEL",travelLines(travel,travelCur,12,first,layout.name),false,12);}
         }
         rr.render(dungeon,cam,status,fps);
         if(!haveFont){

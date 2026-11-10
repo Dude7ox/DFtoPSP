@@ -19,8 +19,8 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
 - Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 455 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 1,404,148 bytes (boot-fix + progression/lockpicking build)
-  - SHA-256: `b032042d91fb0564ee60d7aecde857d2dba7ddc889252e1f68830d78b81cef35`
+  - `EBOOT.PBP`: 1,408,228 bytes (original-font HUD build)
+  - SHA-256: `a02eb9c0269dbd6e3015ec8ec332b0e41f6f610b009d6648a257a0bbf20c9d15`
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables
@@ -57,10 +57,11 @@ Screenshots from the host software renderer:
 - CPU texture uploads use `sceGeEdramGetAddr()`; GE commands use VRAM offsets.
 - 3×3 resident dungeon blocks, streamed as the player crosses 2048-unit block boundaries.
 - Door states are remembered per block instance while streaming.
-- HUD text is drawn through GE from a FONT0001 atlas baked into EDRAM
-  (256x256 T8 + dedicated CLUT, ~64 KB inside the 2 MB budget), with the classic
-  drop shadow; `pspDebugScreen` remains only as fallback and for fatal/diagnostic
-  screens. The host renderer blits the same faces into its framebuffer.
+- HUD text is drawn through GE from a font atlas baked into EDRAM: one 256x512 T8
+  texture holding FONT0001 (status/door hints) and FONT0003 (help line) plus a
+  dedicated CLUT, ~128 KB inside the 2 MB budget, with the classic drop shadow;
+  `pspDebugScreen` remains only as fallback and for fatal/diagnostic screens.
+  The host renderer blits the same faces into its framebuffer.
 - Exit callback thread, analog/DPad controls, noclip, gravity/floor snap, fall recovery.
 - Monster billboards animate per frame (T8 slots keyed by archive/record/frame),
   mirrored for the eastern orientations, with a depth-tested health bar.

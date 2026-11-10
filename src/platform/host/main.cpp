@@ -18,7 +18,8 @@ using namespace dfpsp;
 int main(int argc,char**argv){
     std::string root="data",block="B0000001.RDB",out="frame.bmp";int w=480,h=272;bool layout=false,dungeonMode=false;float cyaw=0.5f,cpitch=-0.1f;bool haveCam=false;Vec3 cpos{};
     std::string music,audioOut,sfxArg,sfxDumpPath;int sfxDumpId=-1,audioRate=22050;double audioSecs=10.0,audioSkip=0.0;bool listSongs=false,listSfx=false;
-    std::string uiMode;bool showStats=false;int region=16,exterior=18358;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
+    std::string uiMode;bool showStats=false;int region=16,exterior=18358;
+    std::string chargenPrefix,invShot;int cgSeed=7,cgRace=1,cgClass=0,cgGender=0;float tick=0.f;std::string savePath,loadPath;int playerLevel=3;bool withEnemies=true;float place=-1.f;bool hurt=false,kill=false;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--root")&&i+1<argc)root=argv[++i];
         else if(!strcmp(argv[i],"--block")&&i+1<argc)block=argv[++i];
@@ -49,10 +50,80 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--list-songs"))listSongs=true;
         else if(!strcmp(argv[i],"--list-sfx"))listSfx=true;
         else if(!strcmp(argv[i],"--region")&&i+1<argc)region=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--chargen-shots")&&i+1<argc)chargenPrefix=argv[++i];
+        else if(!strcmp(argv[i],"--inventory-shot")&&i+1<argc)invShot=argv[++i];
+        else if(!strcmp(argv[i],"--seed")&&i+1<argc)cgSeed=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--race")&&i+1<argc)cgRace=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--gender")&&i+1<argc)cgGender=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--class")&&i+1<argc)cgClass=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--exterior")&&i+1<argc)exterior=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--cam")&&i+3<argc){haveCam=true;cpos={(float)atof(argv[i+1]),(float)atof(argv[i+2]),(float)atof(argv[i+3])};i+=3;}
     }
     Vfs vfs;vfs.addRoot(root);vfs.addRoot(root+"/ARENA2");vfs.loadModList(root);vfs.loadModList(".");
+    // Character creation / inventory validation: scripted flow over the
+    // original screens, one BMP per step, plus the inventory with paper doll.
+    if(!chargenPrefix.empty()||!invShot.empty()){
+        std::vector<Career> classes;
+        if(!loadClasses(vfs,classes)){fprintf(stderr,"classes failed\n");return 1;}
+        NameGen names;names.open(vfs);
+        TextRsc text;text.open(vfs);
+        Font title,body;title.load(vfs,"FONT0001.FNT");body.load(vfs,"FONT0003.FNT");
+        Palette pal;loadPalette(vfs,"ART_PAL.COL",pal);
+        DfRandom rng((u32)cgSeed);
+        BiogFile biog;biog.load(vfs,cgClass);
+        CharGenFlow f;
+        for(int k=0;k<cgRace-1;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+        if(cgGender){charGenAdvance(f,ActDown,classes,biog,names,rng);}
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+        for(int k=0;k<cgClass;k++)charGenAdvance(f,ActDown,classes,biog,names,rng);
+        charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+        Framebuffer fb;fb.resize(320,200);
+        const char* stepNames[]={"race","gender","class","custom","biography","bonusStats","bonusSkills","face","name","summary","done"};
+        int guard=0,shot=0;
+        while(f.step!=StepDone&&guard++<400){
+            drawCharGenScreen(fb,f,classes,biog,text,vfs,pal,body,title);
+            char path[256];snprintf(path,sizeof(path),"%s_%02d_%s.bmp",chargenPrefix.c_str(),shot,stepNames[f.step]);
+            if(!chargenPrefix.empty())writeBmp(path,fb);
+            fprintf(stderr,"step %s\n",stepNames[f.step]);
+            shot++;
+            if(f.step==StepBiography){charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            if(f.step==StepBonusStats){
+                for(int k=0;k<4;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            if(f.step==StepBonusSkills){
+                for(int g=0;g<3;g++){for(int k=0;k<2;k++)charGenAdvance(f,ActRight,classes,biog,names,rng);
+                    charGenAdvance(f,ActDown,classes,biog,names,rng);}
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            if(f.step==StepFace){charGenAdvance(f,ActRight,classes,biog,names,rng);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            if(f.step==StepName){charGenAdvance(f,ActDown,classes,biog,names,rng);
+                charGenAdvance(f,ActConfirm,classes,biog,names,rng);continue;}
+            charGenAdvance(f,ActConfirm,classes,biog,names,rng);
+        }
+        CharacterDoc& d=f.doc;
+        Inventory inv;inv.gold=d.gold;
+        grantBiogItems(inv,d.biog,d.gender,d.race,rng);
+        assignStartingGear(inv,d.classIndex,d.classIndex<0,d.gender,d.race,rng);
+        for(size_t i=0;i<inv.items.size();i++)
+            if(naturalSlot(inv.items[i])!=SlotNone)inv.equip((int)i);
+        PaperDoll doll;doll.load(vfs,d.race,d.gender);
+        drawCharGenScreen(fb,f,classes,biog,text,vfs,pal,body,title);
+        if(!chargenPrefix.empty()){
+            char path[256];snprintf(path,sizeof(path),"%s_99_inventory.bmp",chargenPrefix.c_str());
+            drawInventoryScreen(fb,inv,doll,d.faceIndex,0,0,vfs,pal,body,inv.gold);
+            writeBmp(path,fb);
+        }
+        if(!invShot.empty()){
+            drawInventoryScreen(fb,inv,doll,d.faceIndex,0,0,vfs,pal,body,inv.gold);
+            if(!writeBmp(invShot,fb))return 1;
+        }
+        fprintf(stderr,"created %s, %s %s of class %s: hp %d gold %d, %zu items\n",
+                d.name.c_str(),kGenderNames[d.gender],raceInfo(d.race)->name,d.career.name.c_str(),
+                d.maxHp,d.gold,inv.items.size());
+        printf("%s done\n",chargenPrefix.empty()?invShot.c_str():chargenPrefix.c_str());
+        return 0;
+    }
     Bsa arch3d,blocks,maps,monsters;
     // Audio only path: HMI music from MIDI.BSA and sound effects from
     // DAGGER.SND, rendered with the same synth the PSP audio thread drives.

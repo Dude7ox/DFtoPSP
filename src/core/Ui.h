@@ -1,4 +1,9 @@
 #pragma once
+#include "CharGen.h"
+#include "Inventory.h"
+#include "PaperDoll.h"
+#include "TextRsc.h"
+#include "ImgFile.h"
 #include "Player.h"
 #include "Maps.h"
 #include <string>
@@ -23,4 +28,23 @@ std::vector<std::string> helpLines();
 // sets first to the index of the first visible entry.
 std::vector<std::string> travelLines(const std::vector<LocationEntry>& e,int cursor,int maxLines,int& first,
                                       const std::string& currentName);
+struct CharGenFlow;
+struct Career;
+struct BiogFile;
+class TextRsc;
+class Inventory;
+class PaperDoll;
+// Character creation screens over the original CHGN/CUST/CHAR art and the
+// inventory window with item icons and the paper doll. Both platforms call
+// these so host screenshots and the PSP show the same panels.
+void drawCharGenScreen(Framebuffer& fb,const CharGenFlow& f,
+    const std::vector<Career>& classes,const BiogFile& biog,const TextRsc& text,
+    const Vfs& vfs,const Palette& pal,const Font& body,const Font& title);
+void drawInventoryScreen(Framebuffer& fb,const Inventory& inv,const PaperDoll& doll,
+    int faceIndex,int category,int cursor,const Vfs& vfs,const Palette& pal,
+    const Font& body,int gold);
+int inventoryCategoryCount();
+const char* inventoryCategoryName(int c);
+// Items of one inventory category, in list order (indices into inv.items).
+std::vector<int> inventoryCategoryItems(const Inventory& inv,int category);
 } // namespace

@@ -1,6 +1,6 @@
 {
  "source": "PetrasBartusis/Daggerfall@9f18f5bd0b0c141667d826de7615f178eba9b8a4 + cached classic files",
- "note": "BLOCKS.BSA/MAPS.BSA/FLATS.CFG are original-format but do not match the third-party candidate GOG manifest. WOODS.WLD omitted from repo to fit budget; restore from a full ARENA2 for overworld. MIDI.BSA (HMI music) and DAGGER.SND (sound effects) come from the same cached PetrasBartusis/Daggerfall source; the candidate GOG manifest no longer lists them, so they carry status cached-source. FONT0000-0004.FNT come from daggerfall-unity StreamingAssets and are byte-identical to the PetrasBartusis copies (dual-source-match).",
+ "note": "BLOCKS.BSA/MAPS.BSA/FLATS.CFG are original-format but do not match the third-party candidate GOG manifest. WOODS.WLD omitted from repo to fit budget; restore from a full ARENA2 for overworld. MIDI.BSA (HMI music) and DAGGER.SND (sound effects) come from the same cached PetrasBartusis/Daggerfall source; the candidate GOG manifest no longer lists them, so they carry status cached-source. FONT0000-0004.FNT come from daggerfall-unity StreamingAssets and are byte-identical to the PetrasBartusis copies (dual-source-match). Files added for character creation/inventory (class configs, biographies, namegen, faces, bodies, inventory and item art, TEXTURE.233-252 icon/paperdoll archives) carry status mirror-match: byte-identical to the PetrasBartusis/Daggerfall mirror blob SHAs.",
  "files": [
   {
    "file": "ARCH3D.BSA",
@@ -15,16 +15,688 @@
    "status": "manifest-match"
   },
   {
+   "file": "BIO.DAT",
+   "size": 1727,
+   "sha256": "96a90efbab3f6586d581038ef56cb873b168ec86c289823bf704f79372567c8b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG00I0.IMG",
+   "size": 64000,
+   "sha256": "279059cfd9d4ebe17eee4ad0bdd6630e786dbd9bbf023149bf8563908affc7da",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG00T0.TXT",
+   "size": 2976,
+   "sha256": "47f8b260cfcd7494e0eb414abe1c6378cf75949b5388068d523b057cede01fc1",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG01T0.TXT",
+   "size": 3106,
+   "sha256": "e5fb928c4dc463bfd65d7c9be73b942133e5d9dc9728bb5e8dd0b3d79621816d",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG02T0.TXT",
+   "size": 2915,
+   "sha256": "f8c0bcaa00ff4641faf56d26cc61836d3e705da57f5b825200870d5a044a7f4e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG03T0.TXT",
+   "size": 2949,
+   "sha256": "29c0edf611865568b8911a451454b06257c18ff38a59e403a344231ed62b96da",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG04T0.TXT",
+   "size": 2971,
+   "sha256": "869d160e1c8d4686b1dcdf8371f60cd41115c6950ceb332504761c4ed7fe8537",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG05T0.TXT",
+   "size": 3116,
+   "sha256": "7d8a583c0e87cb72c2f735e3870884b6f526eac9c5ca386e17509c89e182bd55",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG06T0.TXT",
+   "size": 2900,
+   "sha256": "498aa0fa06e2ed79cd3172dee05a4b8d34ba6f7f49f2ef6ce15ac88714f560b6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG07T0.TXT",
+   "size": 2815,
+   "sha256": "ae1e506423e051c607786b2d1c0cbb61d69a2cfac078eb99a53da53b87e603a6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG08T0.TXT",
+   "size": 2769,
+   "sha256": "d30c7e028d617a3668ce1622d74fd36b57db2686f8a961e968f36768e9ce0e86",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG09T0.TXT",
+   "size": 2903,
+   "sha256": "ddbda71caa1e7b6ee8ec4e6c9fba5bd8a60bfc000c1dbcfc0e9005dfe5b7b3cd",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG10T0.TXT",
+   "size": 2745,
+   "sha256": "359350ad36dc10cf736f671fff37d0a17c0a662347a06a9c966d53058d0cac59",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG11T0.TXT",
+   "size": 2871,
+   "sha256": "285437dc2aa330e10d42c33e5696c4b4f2cdcb9789caa4d8bc383d9fbcd21527",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG12T0.TXT",
+   "size": 2999,
+   "sha256": "5d99ed8f592d68644546f1a1c12ff27e35d945aa1900ef229444a1059497a824",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG13T0.TXT",
+   "size": 2744,
+   "sha256": "ced368492c562fb01b6455690363ff2b38fbdd7f30e40de7962041418fe05fb8",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG14T0.TXT",
+   "size": 3345,
+   "sha256": "c0c63c57c107145b5ca64b8d44fe85095102cdb7bb5b64ee948955498ab3ded6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG15T0.TXT",
+   "size": 2979,
+   "sha256": "a660f25e7ab0bf2101bdde70c07f05d0f5b9a4040e5b25703d7fc648c853cda2",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG16T0.TXT",
+   "size": 2918,
+   "sha256": "fddd1c6d09b260d1092ef7df758bd9ef71181fe604c8335e99fbd5fae409d920",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BIOG17T0.TXT",
+   "size": 2866,
+   "sha256": "ae7f7efb9fcef89b5f996f467b39b484365c6c4827d5e48268e60b57f621c0fa",
+   "status": "mirror-match"
+  },
+  {
    "file": "BLOCKS.BSA",
    "size": 32884997,
    "sha256": "6f5a4c8d9401c1b00ef83eaac9b0c6c32f53cef6eaa4c7d7027deb739bde4795",
    "status": "manifest-mismatch"
   },
   {
+   "file": "BODY00I0.IMG",
+   "size": 10017,
+   "sha256": "714b7f8e3a3780acbcdb8f807e3eb11c896d223490f730bd4772003e11a1f10a",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY00I1.IMG",
+   "size": 10017,
+   "sha256": "b444a9651681282cca119becedcc4992557c34da3620052f9ab0a891e4e90f00",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY01I0.IMG",
+   "size": 9948,
+   "sha256": "cc48a4ef3f994e3567cbd0ae0aea5911b2c0e8a8b478fbf334eeacfa5b0bae2c",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY01I1.IMG",
+   "size": 9948,
+   "sha256": "30cfefc42e01c51e65bc12cfd961cb87c1e15535f5df30d7dc07479423257ce9",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY02I0.IMG",
+   "size": 10224,
+   "sha256": "2badf096d82983fdef1a120cae091eca8f4f97d5f2e5a691ad212c73ed853de8",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY02I1.IMG",
+   "size": 10224,
+   "sha256": "2fbbc61cff7bcfb6a6905cf2b8f360e7ac9dfbb39b84b36e28e18ef166b905b6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY03I0.IMG",
+   "size": 9948,
+   "sha256": "27592034455671a93d1cd62aa8464c37d4d6018e7e217ed31a4d52606e1534cc",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY03I1.IMG",
+   "size": 9948,
+   "sha256": "a019a87e21447fa4d702ea90fab6c08f505a199cd0d5ef8ce97820d8bc2e2fc6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY04I0.IMG",
+   "size": 9948,
+   "sha256": "8752e122e8cdf733c5688be5a60f081b4079a9ca4f68192952ff4132616cc0dd",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY04I1.IMG",
+   "size": 9948,
+   "sha256": "eabc3eb7e9772cbba131ec90f4c1f5c7e8681f65de23784c4593052ce5ef5dba",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY05I0.IMG",
+   "size": 9948,
+   "sha256": "4b85079cf1bb20200e7f3bc2fc0dd5e082e4614e1123b8e4270283cb7a5c7f0e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY05I1.IMG",
+   "size": 9948,
+   "sha256": "d4c7d57a622c533fb2e307397d6e542047bac94037d56473b954f356e512f051",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY06I0.IMG",
+   "size": 9948,
+   "sha256": "7d039487e55ae5eff4d8f50b7ffe4fd367bb0ce2884b87140b7f94a280ebc3b4",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY06I1.IMG",
+   "size": 9948,
+   "sha256": "1c20cc4cff4bcbbdf804e1940627bc21c301dbdac7dbfeb4fa8dd75b3bd95636",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY07I0.IMG",
+   "size": 9948,
+   "sha256": "492b3024d3875a1e08faa5ff684352483c309ba770894dc24c24425b6a4fe84a",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY07I1.IMG",
+   "size": 9948,
+   "sha256": "8e39db0102ba5a96de715ccdaaa60541c0eb45affe726955317f10a95e31ce11",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY10I0.IMG",
+   "size": 9450,
+   "sha256": "32a6c5035ebda27da3e0b6c1597944d3d4ef7fbaa2e99eeb04fe683b11bfa92b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY10I1.IMG",
+   "size": 9450,
+   "sha256": "6a943280867219673ad6648d62d73a87492044207c75757f4fdbc3771f72f5c3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY11I0.IMG",
+   "size": 9450,
+   "sha256": "1de1471a91855096e81fca1f0a0da093a54490faa66f8b7ff06c480292297b6b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY11I1.IMG",
+   "size": 9450,
+   "sha256": "258bcbf829a1821f914ae290d2e229a36e9eecb74bc5e317bc949dbfadb63721",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY12I0.IMG",
+   "size": 9450,
+   "sha256": "0b68169a40ca8741cb4dec13e172624ce5c6c0ad1949af4b2bcd0bfa064c7894",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY12I1.IMG",
+   "size": 9450,
+   "sha256": "3388324641a97ef2df884bdb0b26e1637f992b2eb8036024172c95175ad21180",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY13I0.IMG",
+   "size": 9450,
+   "sha256": "67d94357c6148c5aa2a5770e5359d628e3b930a0e6d072a02ddc840d4812f22e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY13I1.IMG",
+   "size": 9450,
+   "sha256": "f0449fbd4283d41dd11f97a7524edab1d101a8be61bcfaa79bc70cd72c32fadf",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY14I0.IMG",
+   "size": 9450,
+   "sha256": "f2f7dc8147c3bc0b1585f9ce67eabee9b713c1aa482cfdea67ab222ec93bdf3e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY14I1.IMG",
+   "size": 9450,
+   "sha256": "40e501c4b85b46b4bda2be0400c1656249fafa39f417e9652abf3f0e44ea81df",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY15I0.IMG",
+   "size": 9450,
+   "sha256": "795ae734b6d3cfeaed3f0e112040d2d6444bda45ef527a2b36624cc48779180b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY15I1.IMG",
+   "size": 9450,
+   "sha256": "75b6fbc247238a341c991be4c23dcde52db0133bd60157f0b6c056c5cf782e57",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY16I0.IMG",
+   "size": 9318,
+   "sha256": "3109339ec4fd27e3db9ae63761c08f7c99334ebe037084d577737c6a729cbfba",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY16I1.IMG",
+   "size": 9318,
+   "sha256": "ec11ee83bfb7c6f545cf84067f861387bdae345be057dd639ab4810528bea9af",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY17I0.IMG",
+   "size": 9318,
+   "sha256": "4bf1098bf95ec060133bffe22810f54382e3d1e9c0831efc7a077ae88f17fb7f",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BODY17I1.IMG",
+   "size": 9318,
+   "sha256": "07e7c5954cf663c5eff0b3fa6810a6eecb12344231ae1ee18a07374a1c0dfa61",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BUTN02I0.IMG",
+   "size": 30924,
+   "sha256": "656433cae4a5b55b40cc2fc696795f4445588e9690da4a3305394aa158cc302d",
+   "status": "mirror-match"
+  },
+  {
+   "file": "BUTTONS.RCI",
+   "size": 10752,
+   "sha256": "957a5b9c6f138d51611ee9bf334f8b2669b65c791562902bacb6d5f4f3470a50",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR00I0.IMG",
+   "size": 64000,
+   "sha256": "28ace27f9d117cf7bce1a81c1d97acc0571be3c37cc527828a4460994ff74cea",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR01I0.IMG",
+   "size": 64000,
+   "sha256": "2753304eb672683311bc5405e008cea4a30fd0cc55f7d208131ef28868021fd4",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR02I0.IMG",
+   "size": 64000,
+   "sha256": "263905680e4bfae95ba42de5982e0a3eb75c3b410a70ae6e260076dfe61578b8",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR02I1.IMG",
+   "size": 312,
+   "sha256": "52f78f0b509ea36cd51bda5949ce8032f960993ddf74c7524176761ccf78acba",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR03I0.IMG",
+   "size": 64000,
+   "sha256": "fa83af5fe74360e60154813d5c69ba0946580232bc96202336faf2bae8d58815",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR03I1.IMG",
+   "size": 345,
+   "sha256": "967e9d8f066d843e2f681206fecf5020842fb8765d87e2dbc44dbd57874b5999",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR04I0.IMG",
+   "size": 64000,
+   "sha256": "7388f014322ad596ca75df42f2b70797e8945b0f8e226b6cf6c7a0cb7be05d2b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR05I0.IMG",
+   "size": 64000,
+   "sha256": "c8bb1bf6d18640584ceb75c78b18fc4a2fa0820135b0e44a897b8df98c10e6b5",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHAR05I1.IMG",
+   "size": 2982,
+   "sha256": "717258f3a0228c848c916f05c27e3566cc584518b17890b4f6695638d89404f6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHGN00I0.IMG",
+   "size": 64768,
+   "sha256": "3e25f3ffa33d25a3e5b963e066f5fd03465e84c3405adcf937a88732ee76e5b7",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CHLD00I0.RCI",
+   "size": 49152,
+   "sha256": "da6f5b562bb904eef380147d0fbe0faad5495d19340f5c65a015ea1ee201d387",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS00.CFG",
+   "size": 74,
+   "sha256": "be68beedc4f12bef56a25b409b94a2d267f6c0ab574f88ed160b7ff54c49c870",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS01.CFG",
+   "size": 74,
+   "sha256": "61451b004fab69c6286601e86c5b9536fc209eeb4692b57d3ac5d00d56641a8b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS02.CFG",
+   "size": 74,
+   "sha256": "31ddbd67a9a0b2e1fb6df78762864974e4d03a8dae6f0540eccd9cc04cf95075",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS03.CFG",
+   "size": 74,
+   "sha256": "0fb6bbbd90bcf6561903f1c2dd22e04ab72fb3f81630f32cca4d1f640958beba",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS04.CFG",
+   "size": 74,
+   "sha256": "e6988b484f7672221ecdbd347e3547e2c7de28c50143027293af954bf3d457a0",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS05.CFG",
+   "size": 74,
+   "sha256": "05def9f51313766880dbf92b4fe75559357df78fb65edeb5932cafb1bf4ec188",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS06.CFG",
+   "size": 74,
+   "sha256": "2793378bb3d86c00d7cbeb1935d52b0fdc0e83f96c1a42b0547bee5b60823504",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS07.CFG",
+   "size": 74,
+   "sha256": "a636f60219779f3e2957959bd1541fb22df9526a76d8bbe44dc7eb27c17007a2",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS08.CFG",
+   "size": 74,
+   "sha256": "65f042c357110586e8a33df7e53a30de8ac4291e3726991c7680a2226a58e826",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS09.CFG",
+   "size": 74,
+   "sha256": "6fd9161e884a74b1a2d6010876e190637c90ee9f1fe73c6e3378dca6774d9937",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS10.CFG",
+   "size": 74,
+   "sha256": "2f7c57085af4542b4a9579e9a8924d3332ccb59d18b991be49ed1e7e44a7d37f",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS11.CFG",
+   "size": 74,
+   "sha256": "57bd796553a5fa251f885652f28fe5e3ccd0818130e067954346eb24f2f38082",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS12.CFG",
+   "size": 74,
+   "sha256": "99c1b6d177a73fc29d12f91b9bb1cad949b7710043df11d114386b0b7dcfb4e0",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS13.CFG",
+   "size": 74,
+   "sha256": "1f519564f535cc74f17384639020a01bc3b2097b9654a6dd694d6ad1f0754bcf",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS14.CFG",
+   "size": 74,
+   "sha256": "550567bbb9ba7aa37aa7d53092f2e5d27096ecfe1b9fe7acd9560ea8a9891765",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS15.CFG",
+   "size": 74,
+   "sha256": "88ffd4f642aea3fa5e75fea8cab02f6d0bc6a2ec90efde4a09ab24895a4920b6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS16.CFG",
+   "size": 74,
+   "sha256": "0bcc15434b887eae2f1f209a7cd6f9eb6779cff5052f532072ce84f52dce78ff",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS17.CFG",
+   "size": 74,
+   "sha256": "a136c8d540f265d64bf7d514eb8140bb6ecc2bb751f2660f0cf3cf676098b82e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASS18.CFG",
+   "size": 74,
+   "sha256": "04cc7047081d7da7b7697484cc23cd214e1a69d9cc310ac211aed798f23f09f0",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CLASSES.DAT",
+   "size": 216,
+   "sha256": "c0332600c0afb982c1354f29bd9a9553548b24d79d28e5411a59a416bf401894",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST00I0.IMG",
+   "size": 64000,
+   "sha256": "2db590a5cfc56beeb939a71d6e7aa465357a519b553d6782f754aab80c63112a",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST01I0.IMG",
+   "size": 33276,
+   "sha256": "41319fb35e835f4db3e7f59f3c8def226b4e965ea3e8865cd00ab06d7bbd6a34",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST02I0.IMG",
+   "size": 5220,
+   "sha256": "b8798eb9f83c6653296ed36ddd9966b2933fcf3e7b9899b8eb52288d00764b45",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST03I0.IMG",
+   "size": 31764,
+   "sha256": "02a3cec5be55c48a4746a5de1de95c4e660216c79c21e3bfb29b473dae55e315",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST04I0.IMG",
+   "size": 33276,
+   "sha256": "b3397c1103cddab62c19bd7679647020fb50b7d9f7134bfb26fea2d095d31bd7",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST05I0.IMG",
+   "size": 4521,
+   "sha256": "9b27a26311d2d8a849291184a70801120959c1f1bfee9542147210e7a062faba",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST06I0.IMG",
+   "size": 4548,
+   "sha256": "c5b057c39b6d81867fe066da7a381998f4f887dc96d62a2c591d2127ed01bfed",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST07I0.IMG",
+   "size": 4548,
+   "sha256": "889d7cadc049a479ceb23e19659805d8ace88c74d71efefc905c6c1f9bb2c207",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST08I0.IMG",
+   "size": 228,
+   "sha256": "2f8d2837b898ac649c60cc817cbc10d5e245f87ee48197c0bddd94504f66315a",
+   "status": "mirror-match"
+  },
+  {
+   "file": "CUST09I0.IMG",
+   "size": 312,
+   "sha256": "52f78f0b509ea36cd51bda5949ce8032f960993ddf74c7524176761ccf78acba",
+   "status": "mirror-match"
+  },
+  {
    "file": "DAGGER.SND",
    "size": 7661766,
    "sha256": "fbb6195ba72f9b2787b659e38afd9ed92d95ca185916d8bdd28ba947b986f3e2",
    "status": "cached-source"
+  },
+  {
+   "file": "FACE00I0.CIF",
+   "size": 7646,
+   "sha256": "d4024ae651e3202ea50ed32aa11c99e9f1e1a2fd9faa3687cdab2f8058cfca08",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE01I0.CIF",
+   "size": 7637,
+   "sha256": "f26218f6e0ece3ee72994f2015da33670d4531683bc3b71e91a973b6153a2438",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE02I0.CIF",
+   "size": 8418,
+   "sha256": "bb735f4e9ffae19b0d07a7074c3ca028cd4c6f1e3861e5f2f92ee30dab9b83d6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE03I0.CIF",
+   "size": 8651,
+   "sha256": "0d936159816189256d57ea62ca890ccecd7e5217c0aa15145a688fbb428f744d",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE04I0.CIF",
+   "size": 8160,
+   "sha256": "702ff76ae5d0b4573778b402f3ac0f6e773f2e2f88d6036d57c0c1e3ae36e71c",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE05I0.CIF",
+   "size": 9555,
+   "sha256": "fd6ea179de2c8df22b278424470b94aefaf04ee70b49e4cfd4a7e82d7b95f54a",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE06I0.CIF",
+   "size": 7541,
+   "sha256": "eb49eb756a461fb5fa021b9282e4abb066c1ca04b984b2c5ce9dc033ccc0edfe",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE07I0.CIF",
+   "size": 6359,
+   "sha256": "a132bb0e4722bd177ef0b34d3f0eb49f37fce7f5425a711ff9980b47d95ab9a7",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE10I0.CIF",
+   "size": 9976,
+   "sha256": "fd3b355a93759d2096a6feefe6e98ac50318ba9fe3bf9f88f9ce4e017153d38d",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE11I0.CIF",
+   "size": 8305,
+   "sha256": "97912835637a417e1ada3aa90d00c2833353d8ffb775dd571615551a23e4d79b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE12I0.CIF",
+   "size": 9644,
+   "sha256": "fadfb4cb6840566733f2ebd1fdc5d56a773fccf48c3182ed52ed8dc48b9bc855",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE13I0.CIF",
+   "size": 8953,
+   "sha256": "8665783453f05f6557fd6de4f840f7e737e06785d9e3177ce54ea3a0b08b40f3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE14I0.CIF",
+   "size": 10313,
+   "sha256": "61b9631de5fefb92cd722e2956d6c98b19595efc0f6b6c8a1fe47e3b3a83cfc3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE15I0.CIF",
+   "size": 9314,
+   "sha256": "15d5c3ae392c414c1f51cf93d61fa3cbae1f98bdecedc170919b77c60e589082",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE16I0.CIF",
+   "size": 8926,
+   "sha256": "b30e9ea0dabd866e963adeb8803e7bf286d2510492faebc8433e9c47e27bbc4e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACE17I0.CIF",
+   "size": 8302,
+   "sha256": "42830ab40dce365b28d7188f83d3406ed072ebf316c5732983f9c9f6b7e26bf2",
+   "status": "mirror-match"
+  },
+  {
+   "file": "FACES.CIF",
+   "size": 249856,
+   "sha256": "343435a095108478558ba40cc4c67ebff063ec71dfe8d81892155e05099ac99a",
+   "status": "mirror-match"
   },
   {
    "file": "FLATS.CFG",
@@ -63,6 +735,36 @@
    "status": "dual-source-match"
   },
   {
+   "file": "INVE00I0.IMG",
+   "size": 64000,
+   "sha256": "ebbe1b8615db14c8c7011b8a2958b53bc7d43e3d8ee9ac40bd19f6134bee4b66",
+   "status": "mirror-match"
+  },
+  {
+   "file": "INVE01I0.IMG",
+   "size": 64000,
+   "sha256": "dfaf8d0a004d41a8381ad3eb8ff080e328a1c518dfc68f9e3618dbd4640ba359",
+   "status": "mirror-match"
+  },
+  {
+   "file": "INVE16I0.CIF",
+   "size": 18754,
+   "sha256": "15f6731978c874a3b2a1aef68c03a36d4215b05b739443b915adaf09ae43601f",
+   "status": "mirror-match"
+  },
+  {
+   "file": "ITEM00I0.IMG",
+   "size": 64000,
+   "sha256": "1027ea1b9d6c23ad279ce37096479cecd9e8aa4bd0e41039a6647b5534a58305",
+   "status": "mirror-match"
+  },
+  {
+   "file": "ITEM01I0.IMG",
+   "size": 2916,
+   "sha256": "02d63f035ad13048e7eda131f21fb9e67db34b904b1cbb831d19bfeb4b6aeb03",
+   "status": "mirror-match"
+  },
+  {
    "file": "MAPS.BSA",
    "size": 22129312,
    "sha256": "8b5550bfcac03b6f605842568fdbfb7cc6bbed7ace5999c33c900ad286fc24be",
@@ -79,6 +781,72 @@
    "size": 27136,
    "sha256": "fcb88bf1bea9845675255c19f838deb414b63fb2df7c6977ab10f21155b6e90f",
    "status": "manifest-match"
+  },
+  {
+   "file": "NAMEGEN.DAT",
+   "size": 8378,
+   "sha256": "1229719909c8109ba610d41648f949c0c0e491b0d6daf9707e852c8e19348f38",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG00I0.IMG",
+   "size": 24762,
+   "sha256": "02175abdbb6b43c4f30b54c966718d780af605abadfdeba78d47c6680ff64f17",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG01I0.IMG",
+   "size": 24762,
+   "sha256": "098f9499f74fd3ce7e5920b024114bd4f989acbab085e1cd66004b90162a66fc",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG02I0.IMG",
+   "size": 24762,
+   "sha256": "480ca72056ca2fee550a498e76dfaa9dcfb0077422208daec4c539236787d9cb",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG03I0.IMG",
+   "size": 24762,
+   "sha256": "7def503f4a6bd13cd9d2353e1685b5872c5e072668f063a978252897fb9c9258",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG04I0.IMG",
+   "size": 24762,
+   "sha256": "6b4a64b5777106652f8a87c7d8fb7a9c1e55e9c7847003fb2f7d3897a6296039",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG05I0.IMG",
+   "size": 24762,
+   "sha256": "f07824f3609ceca78eb17d924cfb6516b003173311835787baa809491951ee6d",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG06I0.IMG",
+   "size": 24762,
+   "sha256": "73de7f33261a3196f7de9d63a7515993a939c0a14406d1226e325f81576d3bcb",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG07I0.IMG",
+   "size": 24762,
+   "sha256": "e89abb7661748246831f1922cf9f7a026d387448c4f3056890f76f4f767f0550",
+   "status": "mirror-match"
+  },
+  {
+   "file": "SCBG08I0.IMG",
+   "size": 24762,
+   "sha256": "cc33cbd1130e7709cf37e38f68b4cb4a2b206c114906dd90bad8b1440aa81c3c",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TAMRIEL2.IMG",
+   "size": 64000,
+   "sha256": "b779443502280e1be7ee43ecd24f7eccc84f5183a61c2602a81e5500d0526bff",
+   "status": "mirror-match"
   },
   {
    "file": "TEXT.RSC",
@@ -1221,6 +1989,12 @@
    "status": "manifest-match"
   },
   {
+   "file": "TEXTURE.202",
+   "size": 85588,
+   "sha256": "2b8134a19bfab26d41fc1170651d6353af5138c0042d1122163b5eabfa2a1348",
+   "status": "mirror-match"
+  },
+  {
    "file": "TEXTURE.203",
    "size": 45418,
    "sha256": "34dd389fc0f309d44dab224b7424cdc3c102d00731a0228509dc57cf486844ce",
@@ -1245,6 +2019,12 @@
    "status": "manifest-match"
   },
   {
+   "file": "TEXTURE.207",
+   "size": 19786,
+   "sha256": "c70500ca419af434cde9a5ed88993c3b01fe6d7c371bd83095a9d9456c29c29c",
+   "status": "mirror-match"
+  },
+  {
    "file": "TEXTURE.208",
    "size": 23011,
    "sha256": "95b51d7905539ca020b5fb79831b492dc335094e1d08ac9458f52c0f728d9400",
@@ -1261,6 +2041,12 @@
    "size": 103526,
    "sha256": "6088cea95c48e8355c04089c9989946dfaec32a40793765f79f33f0a35378f9b",
    "status": "manifest-match"
+  },
+  {
+   "file": "TEXTURE.211",
+   "size": 126202,
+   "sha256": "4cabf0db2fb4bd1fac90b974c8caeb1ab2f0d7469725790a4a691f4d6371708c",
+   "status": "mirror-match"
   },
   {
    "file": "TEXTURE.212",
@@ -1303,6 +2089,114 @@
    "size": 10858,
    "sha256": "c6f270ea0c1c4609f72b499c14f3e3e3847116ae2a70f7dbc6c0b12053f8efcb",
    "status": "manifest-match"
+  },
+  {
+   "file": "TEXTURE.233",
+   "size": 51771,
+   "sha256": "09ffce4bd589a4adb4cbca0531ba9a401bee4da6731051b5dff403750d13cbd0",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.234",
+   "size": 51106,
+   "sha256": "1a09989588c486b7b5348832a331520421c7d3ab47b6765aa3f1bf921a9812d3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.235",
+   "size": 454206,
+   "sha256": "a4cb153b1de1f4953f8d86b951772b232764c948e4abb5cba46c930f5041dbd4",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.236",
+   "size": 482509,
+   "sha256": "3d0cb40b9b0b277190d9968b5c6f626648d3c923240f7272e8bf4f0b3b7b28a1",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.237",
+   "size": 482509,
+   "sha256": "c3117c2d36c94dd4fbc5aa8b4d7dccd4f38b3423eec53cc0adaed074d2ea907e",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.238",
+   "size": 459661,
+   "sha256": "207754bdce6e6e97f5e7c5bf4919cbe645ca95276cd7acadc13ee85b46fc5aa3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.239",
+   "size": 413714,
+   "sha256": "9f9e309d93f7fd146aaf075be046d7b3011cda2f285fa5d87ebc172aaeb2fd76",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.240",
+   "size": 459901,
+   "sha256": "87423ab920dc0329ab621262e0a8415056e7690062a6750e442542c404864ad3",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.241",
+   "size": 455524,
+   "sha256": "5f238ddd8a24aa6e8946bca1336f7733f5a90cbb9603da21a0051436c3abb9e5",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.242",
+   "size": 403501,
+   "sha256": "ae6cd1b830a65d130c815dc2ab8b39e35e322fe0e0c24ec4d7591e05439c4bf6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.245",
+   "size": 79857,
+   "sha256": "7273a1117041104a7d10485c3635b96f48e56c4f2337a6a7b78dee9b836c8447",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.246",
+   "size": 83971,
+   "sha256": "3b5849ffa3e4726f3cfb7eadeef8f88f353961e2e61b54f4098a2ff522e5b4b6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.247",
+   "size": 83971,
+   "sha256": "3b5849ffa3e4726f3cfb7eadeef8f88f353961e2e61b54f4098a2ff522e5b4b6",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.248",
+   "size": 79116,
+   "sha256": "11d14e225ffed32189c94952e9a8e3bc0b8d9dbf6b3c913909fb179a20cbcfb8",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.249",
+   "size": 81631,
+   "sha256": "d1b13be7f0d5b4c06d6fb563356f623c90dab004f392d4478391cca0938706c7",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.250",
+   "size": 89457,
+   "sha256": "b041b2f067df52629aafdaa746a00074d4f871eb722e48cdf660c9d067e1bb5b",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.251",
+   "size": 84047,
+   "sha256": "1efde9ff5b0ce949d0c571b756a4234f0454e9772248bb355d0060d893ef6b2f",
+   "status": "mirror-match"
+  },
+  {
+   "file": "TEXTURE.252",
+   "size": 81434,
+   "sha256": "9d31f6c51f96b17024190f02d554935dfce0891023ab2ff3c4a4da58a8fc33ab",
+   "status": "mirror-match"
   },
   {
    "file": "TEXTURE.253",
@@ -1855,6 +2749,12 @@
    "size": 16602,
    "sha256": "23c67667966f10846c06e26004900571a18af9d67dde1b4c624f2fde5acf806f",
    "status": "manifest-match"
+  },
+  {
+   "file": "TEXTURE.346",
+   "size": 239237,
+   "sha256": "08d48ce4095a5c6f0761393b3f1aebc0bb79a5b15c344f91387f2ce99f5b0247",
+   "status": "mirror-match"
   },
   {
    "file": "TEXTURE.347",
@@ -2773,6 +3673,12 @@
    "size": 135450,
    "sha256": "2551b006932e827f9bf8e5b801f43051b636f2ce2dd3754fd734264f2a6e626d",
    "status": "manifest-match"
+  },
+  {
+   "file": "TMAP00I0.IMG",
+   "size": 64000,
+   "sha256": "741b0c1e00344b962bf1c203ed4d3b0a8efa16e132082ff2f2ea1b94f508aaac",
+   "status": "mirror-match"
   }
  ]
 }

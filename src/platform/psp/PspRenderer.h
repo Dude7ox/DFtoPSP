@@ -18,6 +18,9 @@ public:
     // Automap segments (already in world units) mapped into a panel rect.
     void queueMap(const struct AutomapData& m,int px,int py,int pw,int ph);
     void render(const Dungeon& dungeon,const Camera& cam,const char* status,float fps);
+    // Full-screen 2D presentation of a software framebuffer (character
+    // creation and inventory panels), plus any queued text on top.
+    void presentScreen(const Framebuffer& fb);
     void swap();
     void term();
     int trisLast()const{return statTris_;}
@@ -36,6 +39,7 @@ private:
     UiRect rects_[8]; int nRects_=0;
     struct UiLine { short x0,y0,x1,y1; u32 c; };
     std::vector<UiLine> mapLines_;
+    std::vector<u32> scr_;
     int statTris_=0,statCulled_=0;
     TexSlot& getTex(int a,int r,int frame=0);
     void drawScene(const Scene& s,const Camera& cam,const struct Frustum& fr);

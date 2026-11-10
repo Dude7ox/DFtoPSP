@@ -21,6 +21,9 @@ public:
     // line, 0x01 keeps the line and adds a space, 0x02 pulls the next line up,
     // 0xf9/0xfb skip their argument byte, 0xf6 ends the page and 0xfe the record.
     std::vector<std::string> lines(int id)const;
+    // Subrecord text: classic records such as 9000 pack numbered subrecords
+    // ("1." .. "40.") into one record; sub=-1 returns the whole record.
+    std::vector<std::string> subLines(int id,int sub)const;
     std::string text(int id)const;          // lines joined with '\n'
     bool recordBytes(int id,std::vector<u8>& out)const;
 private:

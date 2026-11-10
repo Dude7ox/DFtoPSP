@@ -1,6 +1,7 @@
 #pragma once
 #include "Vfs.h"
 #include "Random.h"
+#include "TextRsc.h"
 #include <string>
 #include <vector>
 namespace dfpsp {
@@ -90,6 +91,8 @@ struct CharRoll { int attributes[8]; int bonusPool; };
 CharRoll rollStats(const Career& c,DfRandom& rng);
 struct SkillRoll { int values[35]; int pool[3]; };
 SkillRoll rollSkills(const Career& c,DfRandom& rng);
+// A chosen special advantage / disadvantage (classic custom-class screen).
+struct AdvPick { int prim=-1,sec=-1,cost=0; bool dis=false; };
 // The document being built, one step at a time.
 struct CharacterDoc {
     int race=RaceBreton,gender=0;
@@ -106,9 +109,13 @@ struct CharacterDoc {
     int skillValues[35]={0};
     int skillPool[3]={0,0,0};
     int level=1,xp=0,gold=0,maxHp=0,hp=0;
+    int reflexes=2;                 // PlayerReflexes: 0 very high .. 4 very low
+    int mageryOption=-1;            // increased magery spell point multiplier
+    unsigned char expertise[35]={0};
+    std::vector<AdvPick> picks;
     bool rolled=false;
     CharacterDoc();
-    int spellPoints()const;
+    int spellPoints()const;         // honours increased magery
     int maxEncumbrance()const;
     int damageMod()const;
     int toHitMod()const;
@@ -123,23 +130,52 @@ void finalizeCharacter(CharacterDoc& d);
 // Maximum health for a level-1 character of this career and endurance.
 int rollMaxHealth(const Career& c,int endurance,int level=1);
 // --- Creation flow state machine, shared by host and PSP ---
-enum CharGenStep { StepRace=0,StepGender,StepClass,StepCustom,StepBiography,
+enum CharGenStep { StepRace=0,StepRaceConfirm,StepGender,StepClassQuestions,StepClassRecommend,StepClass,
+                   StepCustom,StepAdvList,StepAdvPrimary,StepAdvSecondary,StepBiography,
                    StepBonusStats,StepBonusSkills,StepFace,StepName,StepSummary,StepDone };
+
+
 struct CharGenFlow {
     int step=StepRace;
     int cursor=0;                   // highlighted entry of the current list
     int subCursor=0;                // inner position (answer, question...)
     int page=0;                     // first visible row for long lists
+    int raceX=160,raceY=100;        // province-map cursor
+    int cq[10]={0};                 // picked class-question indices
+    int cqWeights[3]={0,0,0};       // warrior / rogue / mage answers
+    int cqHist[10]={0};             // answered columns, for Back
+    int cqAnswered=0,cqRecommended=-1;
+    bool advDis=false;              // advantage (false) or disadvantage picker
     CharacterDoc doc;
     std::vector<std::string> nameList;   // eight name suggestions
     std::string message;
 };
+// The ten classic class questions: TEXT.RSC record 9000 subrecords, the
+// FALL.EXE answer->path table and the CLASSES.DAT weight->class results.
+struct ClassQuestion { std::vector<std::string> text; std::vector<std::string> answers[3]; };
+bool classQuestion(const TextRsc& t,int index,ClassQuestion& out);
+void classQuestionsRoll(CharGenFlow& f,DfRandom& rng);
+int  classQuestionsRecommend(const Vfs& vfs,const int weights[3]);
+// First map pixel of a province (scripted runs and tests).
+bool racePixel(const Vfs& vfs,int race,int& x,int& y);
+int  raceAt(const Vfs& vfs,int x,int y);   // province id under a map pixel, -1 water
+extern const unsigned char kAnswerTable[120];   // 40 questions x 3 answers
+// Special advantages / disadvantages: menus, labels and classic costs.
+int advCount(bool dis);
+const char* advLabel(bool dis,int prim);
+int advSubCount(bool dis,int prim);
+const char* advSubLabel(bool dis,int prim,int sec);
+int advCost(bool dis,int prim,int sec);
+int difficultyPoints(const CharacterDoc& d);
+void applyAdvPick(CharacterDoc& d,const AdvPick& p);
+void unapplyAdvPick(CharacterDoc& d,const AdvPick& p);
+extern const float kMageryMult[5];
 // Actions the platform layer can send. Returns true when the step changed.
 enum CharGenAction { ActUp,ActDown,ActLeft,ActRight,ActConfirm,ActBack,ActReset };
 bool charGenAdvance(CharGenFlow& f,CharGenAction act,const std::vector<Career>& classes,
-                    const BiogFile& biog,const NameGen& names,DfRandom& rng);
+                    const BiogFile& biog,const NameGen& names,DfRandom& rng,const Vfs& vfs);
 // Advances the flow to the next step with whatever is currently selected
 // (used by scripted host runs and tests).
 void charGenConfirmStep(CharGenFlow& f,const std::vector<Career>& classes,
-                        const BiogFile& biog,const NameGen& names,DfRandom& rng);
+                        const BiogFile& biog,const NameGen& names,DfRandom& rng,const Vfs& vfs);
 } // namespace dfpsp

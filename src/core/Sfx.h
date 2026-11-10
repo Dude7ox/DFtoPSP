@@ -16,7 +16,7 @@ enum {
     ArrowShoot=3, ArrowHit=4,
     Invalid=5,
     AmbientCrickets=6, PlayerDoorBash=7,
-    BodyFall=15,
+    BodyFall=15, Ignite=16,
     ActivateGears=19, ActivateDoorClose=20,
     ArenaFootstep1=22, ArenaFootstep2=23,
     DungeonDoorClose=24, DungeonDoorOpen=25,
@@ -28,7 +28,8 @@ enum {
     FallDamage=91, FallHard=92,
     NormalDoorClose=93, NormalDoorOpen=94, LongSlam=95, LevelUp=96,
     SwingLowPitch=105, SwingHighPitch=106,
-    Hit1=108, Hit2=109, Hit3=110, Hit4=111, Hit5=112
+    Hit1=108, Hit2=109, Hit3=110, Hit4=111, Hit5=112,
+    ButtonClick=360
 };
 } // namespace SfxId
 constexpr int SFX_SAMPLE_RATE=11025;

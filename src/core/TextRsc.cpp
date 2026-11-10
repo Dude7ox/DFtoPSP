@@ -41,6 +41,12 @@ bool TextRsc::recordBytes(int id,std::vector<u8>& out)const{
     }
     return true;
 }
+static std::string trim(const std::string& s){
+    size_t a=0,b=s.size();
+    while(a<b&&(s[a]==' '||s[a]=='\t'))a++;
+    while(b>a&&(s[b-1]==' '||s[b-1]=='\t'||s[b-1]=='\r'))b--;
+    return s.substr(a,b-a);
+}
 std::vector<std::string> TextRsc::lines(int id)const{
     std::vector<std::string> res;
     std::vector<u8> rec;
@@ -59,6 +65,42 @@ std::vector<std::string> TextRsc::lines(int id)const{
     // Trailing empty lines carry no information in a fixed-height panel.
     while(!res.empty()&&res.back().empty())res.pop_back();
     return res;
+}
+std::vector<std::string> TextRsc::subLines(int id,int sub)const{
+    // TEXT.RSC record 9000 (the class questions) stores its subrecords on
+    // 0xfc-separated lines numbered "N." - Daggerfall Unity splits the whole
+    // record on the \d+[.] pattern, so match that behaviour.
+    std::vector<u8> rec;
+    if(!recordBytes(id,rec))return std::vector<std::string>();
+    std::vector<std::string> lines;
+    std::string cur;
+    for(size_t i=0;i<rec.size();i++){
+        u8 b=rec[i];
+        if(b==0xfe)break;
+        if(b==0xfc||b==0xfd||b==0x00||b==0x0a||b==0x0d){lines.push_back(cur);cur.clear();}
+        else if(b>=0x20&&b<=0x7f)cur+=(char)b;
+    }
+    if(!cur.empty())lines.push_back(cur);
+    std::vector<std::string> out;
+    int cursub=-1;
+    for(size_t i=0;i<lines.size();i++){
+        const std::string& l=lines[i];
+        int marker=-1;
+        for(size_t p=0;p+1<l.size();p++){
+            if(l[p]>='0'&&l[p]<='9'){
+                size_t q=p;
+                while(q<l.size()&&l[q]>='0'&&l[q]<='9'&&q-p<2)q++;
+                if(q<l.size()&&l[q]=='.'&&q>p){marker=std::atoi(l.substr(p,q-p).c_str());
+                    cur=l.substr(q+1);break;}
+            }
+        }
+        if(marker>=0){
+            cursub=marker;
+            if(cursub==sub&&!trim(cur).empty())out.push_back(trim(cur));
+        }else if(cursub==sub)out.push_back(l);
+    }
+    while(!out.empty()&&trim(out.back()).empty())out.pop_back();
+    return out;
 }
 std::string TextRsc::text(int id)const{
     std::vector<std::string> ls=lines(id);

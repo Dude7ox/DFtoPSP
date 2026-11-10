@@ -17,10 +17,10 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
 - Single-block load: `B0000001.RDB` -> 1128 world triangles, 36 model instances,
   12 gameplay flats, 4 action doors.
 - Dungeon streaming preview: 7 resident blocks, 17071 triangles at the starting area.
-- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 613 checked, 0 bad.
+- Data manifest verification: `python3 tools/verify_data.py data/ARENA2` -> 618 checked, 0 bad.
 - PSP cross-compile and PBP packaging succeed.
-  - `EBOOT.PBP`: 687,340 bytes (character creation build, stripped)
-  - SHA-256: `198c732f26d968a8b127ed7e18b30c46cd0ef0be6f5ef3980943f1c8b780d626`
+  - `EBOOT.PBP`: 725,852 bytes (classic-parity creation build, stripped)
+  - SHA-256: `9961ee6e9f0507056a7d36decba96d6613922c236d47e89cbdd489832bdd2f73921`
 
 ## Character creation increment
 
@@ -45,6 +45,29 @@ Target: PSP-1000 (32 MB) first; PSP-2000/3000 fallback.
   `data/MANIFEST.json` with mirror blob-SHA provenance: class configs,
   biographies, NAMEGEN.DAT, faces/bodies/backgrounds, chargen screens,
   inventory art and TEXTURE.233-252 icon/paper-doll archives.
+
+## Classic-parity completion of character creation
+
+- Province map: the race step walks a cursor over `TMAP00I0.IMG` and decodes
+  the chosen race from the index-only `TAMRIEL2.IMG` pixel under it (pixel
+  value = race id), then shows the classic description dialog and plays the
+  spoken province id (DAGGER.SND 209-216).
+- Class questions: ten of the forty `TEXT.RSC` 9000 subrecords, the classic
+  FALL.EXE answer table and the `CLASSES.DAT` weight lookup produce the
+  recommended class, offered in the accept / choose-manually dialog; every
+  answer plays `SoundClips.Ignite`.
+- Special advantages and disadvantages: the full `difficultyDict` cost tables
+  (magery x1..x3, immunity, regeneration variants, forbidden materials per
+  material, phobias, critical weakness, ...), max seven picks, difficulty
+  total clamped to -12..40; picks mutate the career exactly where
+  `CLASS??.CFG` stores them and round-trip through the save file.
+- Summary screen revisits face and reflexes (critical chance
+  `50-10*(reflex-2)` %) before the character is accepted.
+- Save format v5 adds reflexes, magery option and the pick list; v1-v4 still
+  load. `TEXT.RSC` gained `subLines()` for numbered subrecords (9000).
+- New data files (5): `TMAP00I0.IMG` companion `SCRL00I0.GFX`/`SCRL01I0.GFX`
+  scroll art, `CHAR05I1.IMG` summary highlight and the `ROGUE.CEL`,
+  `MAGE.CEL`, `WARRIOR.CEL` constellation animations; manifest now 618 files.
 
 - Monsters: editor spawn markers (archive 199 records 15/16) are parsed from every
   resident block; random markers resolve through the classic encounter tables

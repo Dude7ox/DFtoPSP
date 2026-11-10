@@ -28,10 +28,12 @@ struct SavedCharacter {
     std::string name;
     int attributes[8]={0},rolledAttributes[8]={0};
     int bonusPool=0,skillValues[35]={0},skillPool[3]={0},answers[12]={0};
+    int reflexes=2,mageryOption=-1;
+    std::vector<int> pickPrim,pickSec,pickCost,pickDis;
     Career career;
 };
 struct SaveData {
-    u32 version=4;
+    u32 version=5;
     PlayerState player;
     int region=0, exteriorId=0;
     std::string dungeonName;

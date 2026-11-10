@@ -211,7 +211,15 @@ int main(int argc,char**argv){
             else if(pressed&PSP_CTRL_SQUARE)act=ActReset;
             else have=false;
             if(have){
-                charGenAdvance(cgFlow,act,classes,cgBiog,names,cgRng);
+                int prevStep=cgFlow.step;
+                charGenAdvance(cgFlow,act,classes,cgBiog,names,cgRng,vfs);
+                if(cgFlow.step!=prevStep&&audioOk&&audio.sfxReady()){
+                    // Classic UI voices: Ignite when a class-question answer
+                    // lands, the province's spoken id on the map, click else.
+                    if(prevStep==StepClassQuestions&&act==ActConfirm)audio.play(SfxId::Ignite,127,0);
+                    else if(prevStep==StepRace&&act==ActConfirm)audio.play(208+cgFlow.doc.race,127,0);
+                    else audio.play(SfxId::ButtonClick,127,0);
+                }
                 if(cgFlow.step==StepBiography&&cgBiogClass!=cgFlow.doc.classIndex){
                     cgBiogClass=cgFlow.doc.classIndex;
                     cgBiog.load(vfs,cgBiogClass<0?0:cgBiogClass);

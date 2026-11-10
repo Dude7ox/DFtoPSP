@@ -26,6 +26,11 @@ Implemented:
 - UI windows in the original faces (Select cycles): HELP, CHARACTER sheet, MESSAGE LOG
   (hits, kills, level-ups, lockpicks), TRAVEL and a dungeon automap (walls, doors,
   player arrow) built from the streamed block geometry.
+- Audio straight from the original files: HMI music from `MIDI.BSA` (131 songs parsed
+  and rendered by a 28-voice software synthesizer at 22050 Hz stereo) and effects from
+  `DAGGER.SND` (459 records), spatialised per monster and streamed on the PSP by a
+  dedicated `sceAudioSRC` thread; the host tool writes WAV renders for validation
+  (`docs/AUDIO.md`, `docs/audio.wav`).
 - Travel: the classic dungeon list of the current region from MAPS.BSA; travel to any
   entry with the cursor + X; the saved location is restored on boot.
 - PSP controls: analog move, DPad look, X door/lockpick, Square attack, O run, Triangle noclip, L/R noclip vertical, Start save, Select window, HOME exit.
@@ -35,8 +40,9 @@ Implemented:
 - Cross-compiled `EBOOT.PBP` included in the repository.
 
 Not implemented yet:
-- Inventory, quests, dialogue, audio, spells, automap, overworld terrain rendering
-  (the TRAVEL window replaces walking the world map for now).
+- Inventory (blocked by a missing `ITEMS.BSA` in the cached data), quests, dialogue,
+  spells and overworld terrain rendering (`WOODS.WLD` is missing too; the TRAVEL window
+  replaces walking the world map for now).
 - Full campaign data coverage; the shipped subset covers region 16 travel plus the
   blocks/textures those dungeons reference.
 - Real-PSP / PPSSPP execution validation is still pending in this environment.
@@ -64,6 +70,13 @@ cmake --build build -j2
 ./build/dfpsp_host --root data --layout
 ./build/dfpsp_host --root data --block B0000001.RDB --out frame.bmp
 ./build/dfpsp_host --root data --dungeon --out dungeon.bmp
+
+# audio: list the HMI archive, render music, stage sound effects, dump one record
+./build/dfpsp_host --root data --list-songs
+./build/dfpsp_host --root data --music D1.HMI --audio-secs 30 --audio-out d1.wav
+./build/dfpsp_host --root data --music DUNGEON.HMI --audio-skip 20 \
+    --sfx 106@1.0,108@1.35,25@6.5 --audio-secs 16 --audio-out mix.wav
+./build/dfpsp_host --root data --sfx-dump 106 --sfx-out swing.wav
 ```
 
 ## Build PSP EBOOT

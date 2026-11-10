@@ -13,6 +13,8 @@
 #include "../../core/SaveGame.h"
 #include "../../core/Ui.h"
 #include "../../core/Automap.h"
+#include "../../core/Sfx.h"
+#include "PspAudio.h"
 #include "PspRenderer.h"
 PSP_MODULE_INFO("DFtoPSP",0,0,3);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER|THREAD_ATTR_VFPU);
@@ -32,6 +34,16 @@ static void fatalDiag(const char* msg,const std::string& diag){
     pspDebugScreenPrintf("DFtoPSP\n\n%s\n\n%s\nPress HOME to exit.\n",msg,diag.c_str());
     while(!exitRequested)sceDisplayWaitVblankStart();
     sceKernelExitGame();
+}
+// Distance attenuation and stereo pan for a world position, so doors and
+// monster voices come from the direction the player is looking at.
+static void spatialAudio(const Vec3& p,const Vec3& camPos,float yaw,int& vol,int& pan){
+    Vec3 d=p-camPos;float dist=d.len();
+    float v=110.0f-70.0f*(dist/2200.0f);if(v<25.0f)v=25.0f;if(v>110.0f)v=110.0f;
+    Vec3 right{std::cos(yaw),0,-std::sin(yaw)};
+    float side=(dist>1.0f)?d.norm().dot(right):0.0f;
+    int s=(int)(side*90.0f);if(s>100)s=100;if(s<-100)s=-100;
+    vol=(int)v;pan=s;
 }
 // Classic-style window panel: dark plate, thin border, FONT0001 title and
 // FONT0003 body lines. `tail` shows the newest lines (message log).
@@ -112,14 +124,40 @@ int main(int argc,char**argv){
     Font font;font.load(vfs,"FONT0001.FNT");
     Font fontSmall;fontSmall.load(vfs,"FONT0003.FNT");
     bool haveFont=rr.initFont(font,fontSmall);
+    // Audio: HMI music from MIDI.BSA and 8-bit samples from DAGGER.SND, mixed on
+    // their own thread. Missing archives only cost silence, never the game.
+    PspAudio audio;
+    bool audioOk=audio.init(vfs);
+    if(audioOk)dungeon.setSoundSink(&audio);
+    // Daggerfall keeps ten dungeon themes; pick one per dungeon so travelling
+    // changes the music, and fall back to the generic theme.
+    auto startMusic=[&]()->std::string{
+        if(!audioOk||!audio.musicReady())return std::string();
+        char nm[16];snprintf(nm,sizeof(nm),"D%d.HMI",1+(layout.exteriorId%10));
+        int idx=audio.songIndex(nm);
+        if(idx<0)idx=audio.songIndex("DUNGEON.HMI");
+        if(idx<0)return std::string();
+        audio.playSong(idx);
+        return audio.songName(idx);
+    };
     pspDebugScreenInitEx(sceGeEdramGetAddr(),PSP_DISPLAY_PIXEL_FORMAT_565,0);
     Vec3 feet=restored?player.pos:dungeon.spawn();
     float yaw=restored?player.yaw:0.5f,pitch=restored?player.pitch:-0.05f,vertical=0.f;
     bool noclip=false;int win=0;   // 0 none, 1 help, 2 character, 3 log, 4 travel
     std::vector<LocationEntry> travel;listRegionDungeons(maps,layout.region,travel);int travelCur=0;
     SceCtrlData pad{},old{};u64 last=sceKernelGetSystemTimeWide();float fps=60.f;u32 frames=0;float fpsTimer=0.f;
+    float stepTimer=0.f,ambientTimer=18.f,stepToggle=0.f;
     char status[160];status[0]=0;
     MsgLog log;dungeon.setLog(&log);log.push("You enter "+layout.name+".");
+    if(audioOk){
+        char line[128];
+        snprintf(line,sizeof(line),"Audio %d Hz %s, %zu songs, %zu sounds.",audio.sampleRate(),
+                 audio.usingSrcChannel()?"SRC":"hw",audio.songCount(),audio.sfxCount());
+        log.push(line);
+        audio.setMusicVolume(70);
+        std::string song=startMusic();
+        if(!song.empty())log.push("Music: "+song+".");
+    }else log.push("Audio unavailable (MIDI.BSA / DAGGER.SND missing).");
     float hurtFlash=0.f;
     while(!exitRequested){
         sceCtrlReadBufferPositive(&pad,1);u32 pressed=pad.Buttons&~old.Buttons;old=pad;
@@ -135,7 +173,8 @@ int main(int argc,char**argv){
                 if(loadDungeonLayout(maps,layout.region,travel[travelCur].exteriorId,nl)&&dungeon.enter(nl,player.level)){
                     layout=nl;feet=dungeon.spawn();yaw=0.5f;pitch=-0.05f;vertical=0;
                     log.push("You travel to "+layout.name+".");
-                    snprintf(status,sizeof(status),"TRAVELED");
+                    std::string song=startMusic();
+                    snprintf(status,sizeof(status),song.empty()?"TRAVELED":("TRAVELED "+song).c_str());
                 }else snprintf(status,sizeof(status),"TRAVEL FAILED");
             }
         }
@@ -158,6 +197,26 @@ int main(int argc,char**argv){
             if(fy>-100.f){feet.y=fy;vertical=0;}else{vertical-=900.f*dt;feet.y+=vertical*dt;float below=dungeon.floor(feet,feet.y+4.f);if(below>-100.f&&feet.y<=below){feet.y=below;vertical=0;}}
             if(feet.y<-2000.f){feet=dungeon.spawn();vertical=0;}
         }
+        // Footsteps while walking on the ground, plus the odd dungeon ambience.
+        if(audioOk&&audio.sfxReady()){
+            bool moving=world&&!noclip&&(std::fabs(lx)>0.01f||std::fabs(ly)>0.01f)&&vertical==0.f;
+            stepTimer-=dt*(moving?1.0f:0.0f);
+            if(moving&&stepTimer<=0.f){
+                stepTimer=(pad.Buttons&PSP_CTRL_CIRCLE)?0.32f:0.48f;
+                stepToggle=stepToggle>0.5f?0.f:1.f;
+                int id=stepToggle>0.5f?SfxId::ArenaFootstep2:SfxId::ArenaFootstep1;
+                audio.play(id,60,0);
+            }
+            ambientTimer-=dt;
+            if(ambientTimer<=0.f){
+                ambientTimer=25.0f+(float)(now%17000)/1000.0f;
+                static const int amb[]={SfxId::SpookyHigh,SfxId::SpookyMid,SfxId::SpookyLow,
+                                        SfxId::AmbientDripShort,SfxId::AmbientWindMoan};
+                int id=amb[(now/1000000)%5];
+                int pan=(int)((now/7000)%160)-80;
+                audio.play(id,40,pan);
+            }
+        }
         if(world&&pad.Buttons&PSP_CTRL_LEFT)yaw-=1.8f*dt;if(world&&pad.Buttons&PSP_CTRL_RIGHT)yaw+=1.8f*dt;
         if(world&&pad.Buttons&PSP_CTRL_UP)pitch+=1.2f*dt;if(world&&pad.Buttons&PSP_CTRL_DOWN)pitch-=1.2f*dt;
         if(pitch>1.2f)pitch=1.2f;if(pitch<-1.2f)pitch=-1.2f;
@@ -168,10 +227,15 @@ int main(int argc,char**argv){
         Vec3 look{std::sin(yaw)*std::cos(pitch),std::sin(pitch),std::cos(yaw)*std::cos(pitch)};
         Door* door=dungeon.aimedDoor(cam.pos,look);
         if(world&&(pressed&PSP_CTRL_CROSS)&&door){
+            bool moved=false;
             if(door->locked){
-                if(dungeon.pickLock(player,*door)){snprintf(status,sizeof(status),"LOCK PICKED");toggleDoor(*door);}
+                if(dungeon.pickLock(player,*door)){snprintf(status,sizeof(status),"LOCK PICKED");moved=toggleDoor(*door);}
                 else snprintf(status,sizeof(status),"LOCKED");
-            }else toggleDoor(*door);
+            }else moved=toggleDoor(*door);
+            if(moved&&audioOk){
+                int vol=100,pan=0;spatialAudio(door->pos,cam.pos,yaw,vol,pan);
+                audio.play(door->target>0.5f?SfxId::DungeonDoorOpen:SfxId::DungeonDoorClose,vol,pan);
+            }
         }
         if(world&&(pressed&PSP_CTRL_SQUARE)&&player.attackCooldown<=0.f&&!player.dead){
             player.attackCooldown=0.8f;
@@ -185,6 +249,7 @@ int main(int argc,char**argv){
             snprintf(status,sizeof(status),"-%d HP",hurt);
             if(player.hp<=0){
                 player.hp=player.maxHp;feet=dungeon.spawn();vertical=0;
+                if(audioOk)audio.play(SfxId::FallHard,120,0);
                 snprintf(status,sizeof(status),"YOU DIED - back at the entrance");
             }
         }
@@ -226,5 +291,6 @@ int main(int argc,char**argv){
         }
         rr.swap();
     }
+    if(audioOk)audio.term();
     rr.term();sceKernelExitGame();return 0;
 }

@@ -3,6 +3,7 @@
 #include "Maps.h"
 #include "Enemy.h"
 #include "Player.h"
+#include "Sfx.h"
 #include <map>
 #include <set>
 namespace dfpsp {
@@ -39,6 +40,9 @@ public:
     const EnemyBook& book()const{return book_;}
     // Optional gameplay message sink for the UI log window.
     void setLog(MsgLog* l){log_=l;}
+    // Optional classic sound effect sink (see Sfx.h); nullptr keeps the dungeon
+    // silent, which is what the software renderer benchmarks want.
+    void setSoundSink(SoundSink* s){sound_=s;}
     const std::vector<Enemy>& enemies()const{return enemies_;}
     const std::vector<std::string>& deadKeys()const{return deadKeys_;}
     const std::vector<std::string>& spawnedKeys()const{return spawnedKeys_;}
@@ -47,10 +51,17 @@ private:
     SceneBuilder builder_; DungeonLayout layout_; std::vector<Resident> resident_;
     EnemyBook book_;
     MsgLog* log_=nullptr;
+    SoundSink* sound_=nullptr;
+    void cue(int id,int vol=100,int pan=0){if(sound_&&id>=0)sound_->play(id,vol,pan);}
+    // Positions a monster sound with distance attenuation and stereo pan.
+    void cueAt(const Enemy& e,int id,const Vec3& player,const Vec3& camForward);
     std::vector<Enemy> enemies_;
     std::vector<std::string> deadKeys_, spawnedKeys_;
     std::set<std::string> deadSet_, spawnedSet_;
     DfRandom rng_;
+    // Cosmetic rolls only (which swing or impact sample to use). Keeping them out
+    // of rng_ preserves the classic combat sequence the tests pin down.
+    DfRandom sfxRng_{0x51ed27u};
     int encounterLand_[256]={0}, encounterWater_[256]={0};
     int playerLevel_=3;
     int currentX_=0,currentZ_=0;Vec3 spawn_;

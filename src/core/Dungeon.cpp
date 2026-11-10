@@ -96,6 +96,16 @@ void Dungeon::tick(float dt){for(auto& r:resident_)updateDoors(r.scene,dt);}
 static bool losTrampoline(void* ctx,const Vec3& a,const Vec3& b){return ((Dungeon*)ctx)->lineOfSight(a,b);}
 static Vec3 moveTrampoline(void* ctx,const Vec3& feet,const Vec3& delta,float radius,float height){return ((Dungeon*)ctx)->move(feet,delta,radius,height);}
 static float floorTrampoline(void* ctx,const Vec3& pos,float maxY){return ((Dungeon*)ctx)->floor(pos,maxY);}
+void Dungeon::cueAt(const Enemy& e,int id,const Vec3& player,const Vec3& camForward){
+    if(!sound_||id<0)return;
+    Vec3 d=e.pos-player;float dist=d.len();
+    float v=110.0f-70.0f*(dist/2200.0f);
+    if(v<25.0f)v=25.0f;if(v>110.0f)v=110.0f;
+    Vec3 right{camForward.z,0,-camForward.x};
+    float rl=right.len();float side=(dist>1.0f&&rl>1e-4f)?d.norm().dot(right*(1.0f/rl)):0.0f;
+    int pan=(int)(side*90.0f);if(pan>100)pan=100;if(pan<-100)pan=-100;
+    sound_->play(id,(int)v,pan);
+}
 int Dungeon::tickEnemies(float dt,const PlayerState& player,const Vec3& camForward){
     int damage=0;
     EnemyWorld w;
@@ -105,9 +115,19 @@ int Dungeon::tickEnemies(float dt,const PlayerState& player,const Vec3& camForwa
         if(!residentAt(e.pos))continue;   // only simulate monsters near the player
         const EnemyStatic* st=findEnemyStatic(e.mobileId);
         if(!st)continue;
+        bool wasAggro=e.aggro;EnemyState wasState=e.state;
         int d=updateEnemy(e,*st,w,rng_,dt);
         if(d>0&&log_)log_->push("The "+book_.name(e.mobileId)+" hits you for "+std::to_string(d)+".");
         damage+=d;
+        if(sound_){
+            // Classic voice work: a monster that spots you barks, one that swings
+            // uses its attack sound, one that dies drops.
+            if(!wasAggro&&e.aggro)cueAt(e,st->barkSound,player.pos,camForward);
+            if(wasState!=EnemyAttack&&e.state==EnemyAttack)cueAt(e,st->attackSound,player.pos,camForward);
+            else if(wasState!=EnemyHurt&&e.state==EnemyHurt)cueAt(e,st->barkSound,player.pos,camForward);
+            else if(wasState!=EnemyDead&&e.state==EnemyDead)cueAt(e,SfxId::BodyFall,player.pos,camForward);
+            if(d>0)cue(SfxId::ArenaHitSound,110,0);
+        }
         orientEnemy(e,player.pos,camForward);
     }
     return damage;
@@ -136,6 +156,7 @@ int Dungeon::playerAttack(PlayerState& player,const Vec3& camForward,float range
         if(!lineOfSight(eye,e.pos+Vec3{0,enemyEyeHeight(e),0}))continue;
         if(score>bestScore){bestScore=score;best=&e;}
     }
+    cue(sfxRng_.percent()<50?SfxId::SwingLowPitch:SfxId::SwingHighPitch,110,0);
     if(!best)return 0;
     const EnemyStatic* st=findEnemyStatic(best->mobileId);
     if(!st)return 0;
@@ -149,12 +170,18 @@ int Dungeon::playerAttack(PlayerState& player,const Vec3& camForward,float range
         int xpG=0,goldG=0,lvlBefore=player.level;
         awardProgress(player,st->level,rng_,xpG,goldG);
         player.kills++;
+        cue(SfxId::BodyFall,110,0);
+        if(player.level>lvlBefore)cue(SfxId::ArenaFanfareLevelUp,120,0);
         if(log_){
             log_->push("The "+name+" dies. +"+std::to_string(xpG)+" xp +"+std::to_string(goldG)+" g");
             if(player.level>lvlBefore)log_->push("Level up! Now level "+std::to_string(player.level)+".");
         }
     }else{
         best->state=EnemyHurt;best->hurtTimer=0.4f;best->animTimer=0.f;
+        if(dmg>0){
+            cue(SfxId::Hit1+sfxRng_.range(5),110,0);
+            cueAt(*best,st->barkSound,player.pos,camForward);
+        }
         if(log_)log_->push(dmg>0?"You hit the "+name+" for "+std::to_string(dmg)+".":"You miss the "+name+".");
     }
     return dmg;
@@ -175,6 +202,7 @@ void Dungeon::setEnemies(const std::vector<Enemy>& e,const std::vector<std::stri
 }
 bool Dungeon::pickLock(PlayerState& player,Door& door){
     if(!door.locked)return true;
+    cue(SfxId::ActivateGrind,110,0);
     float chance=0.10f+player.lockpick/200.f+player.level*0.01f;
     if(chance<0.05f)chance=0.05f;if(chance>0.8f)chance=0.8f;
     if(rng_.percent()<=(int)(chance*100.f)){door.locked=false;if(log_)log_->push("You pick the lock.");return true;}

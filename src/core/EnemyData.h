@@ -8,6 +8,7 @@
 //   Assets/Scripts/Utility/EnemyBasics.cs
 //   Assets/Scripts/Utility/RandomEncounters.cs
 //   Assets/Scripts/DaggerfallUnityEnums.cs
+//   Assets/Scripts/SoundClips.cs
 // They reproduce enemy combat numbers and encounter tables that live inside the
 // original FALL.EXE rather than in the game data files. Names, hit points per
 // level, attributes and resistances are read from the original MONSTER.BSA at
@@ -33,6 +34,7 @@ struct EnemyStatic {
     signed char attack1[10], attack2[10], attack3[10]; // -2 terminates a sequence
     unsigned char chance2, chance3;
     int soulPts;
+    int moveSound, barkSound, attackSound;   // DAGGER.SND record indices, -1 when silent
 };
 extern const int kEnemyCount;
 extern const EnemyStatic kEnemies[];
